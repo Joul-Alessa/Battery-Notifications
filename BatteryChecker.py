@@ -54,7 +54,7 @@ def check_battery_level():
         plugged = battery.power_plugged
         
         # Verificar el nivel de la batería y si está conectada a la corriente
-        if level <= 100 and not plugged:
+        if level <= 20 and not plugged:
             titleNotif = "Alerta de Batería"
             messageNotif = f"⚠️ Nivel de batería bajo ({level} %). \nConecta el cargador."
             send_notification(titleNotif, messageNotif)
