@@ -11,6 +11,8 @@ import time
 from playsound import playsound
 from notifypy import Notify
 import requests
+import signal
+import sys
 
 # Librarías para evitar mostrar información sensible en el código
 from dotenv import load_dotenv
@@ -45,6 +47,19 @@ def send_notification(title, message):
     notification.title = title
     notification.message = message
     notification.send()
+
+# Función que revisa cuando el archivo está por ser interrumpido (para las suspensiones y apagados)
+def handle_interrupt(signal_received, frame):
+    battery = psutil.sensors_battery()
+    level = battery.percent
+    plugged = battery.power_plugged
+    if plugged == True:
+        messageNotif = f"⚡ El programa dejará de monitorear el nivel de batería ({level} %). Desenchufar"
+    else:
+        messageNotif = f"⚡ El programa dejará de monitorear el nivel de batería ({level} %)."
+    send_telegram_message(messageNotif)
+    # Aquí puedes realizar tareas como cerrar archivos, guardar datos, etc.
+    sys.exit(0)  # Salir del programa después de realizar la acción deseada
 
 # Función general que revisa el estado de la batería
 def check_battery_level():
@@ -83,4 +98,6 @@ def main():
         time.sleep(10)  # Espera 10 segundos antes de volver a comprobar
 
 if __name__ == "__main__":
+    # Configuramos el manejador para la señal SIGINT
+    signal.signal(signal.SIGINT, handle_interrupt)
     main()
