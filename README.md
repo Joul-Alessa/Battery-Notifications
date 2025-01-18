@@ -18,7 +18,7 @@ The goal of this development was to detect if the computer's battery reached a m
 - The ```psutil``` library was used to check the battery level and whether it was charging or not.
 - The ```notify-py``` library was used to send notification messages to the computer.
 - The ```requests``` library was used to make a request through the Telegram API to a custom bot that would send another notification to our chats.
-- The ```playsound``` library was used to play a sound as part of the computer's notification.
+- The ```playsound``` library (version 1.2.2 beacuse the latest version doesn't play the sound) was used to play a sound as part of the computer's notification.
 - The ```signal``` library was used to check signals sent to the system and recognize the end of the program's execution, allowing a notification to be sent at that point.
 - The ```dotenv``` library was used to store sensitive information in a file external to the developed code.
 - The ```argparse``` library was used to support console arguments and make the automation of this task more customizable.

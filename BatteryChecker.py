@@ -87,17 +87,16 @@ def check_battery_level():
             send_notification(titleNotif, messageNotif)
             send_telegram_message(messageNotif)
             if args.sound == True:
-                playsound("sounds/battery-low.mp3")
+                playsound(os.path.join(os.path.dirname(os.path.abspath(__file__)), "sounds", "battery-low.mp3"))
             
             time.sleep(80)
         elif level >= args.higher and plugged:
-            #Envia notificacion de sistema
             titleNotif = "Alerta de Batería"
             messageNotif = f"⚡ Batería casi llena ({level} %). \nConsidera desconectar el cargador."
             send_notification(titleNotif, messageNotif)
             send_telegram_message(messageNotif)
             if args.sound == True:
-                playsound("sounds/battery-high.mp3")
+                playsound(os.path.join(os.path.dirname(os.path.abspath(__file__)), "sounds", "battery-high.mp3"))
             
             time.sleep(80)
     else:
