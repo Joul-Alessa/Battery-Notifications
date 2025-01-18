@@ -58,8 +58,7 @@ def handle_interrupt(signal_received, frame):
     else:
         messageNotif = f"⚡ El programa dejará de monitorear el nivel de batería ({level} %)."
     send_telegram_message(messageNotif)
-    # Aquí puedes realizar tareas como cerrar archivos, guardar datos, etc.
-    sys.exit(0)  # Salir del programa después de realizar la acción deseada
+    sys.exit(0)
 
 # Función general que revisa el estado de la batería
 def check_battery_level():
