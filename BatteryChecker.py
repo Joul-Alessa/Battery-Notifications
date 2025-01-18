@@ -8,6 +8,7 @@ Created on Thu Jan 16 12:23:01 2025
 # Librerías para el manejo de todo el programa
 import psutil
 import time
+from playsound import playsound
 from notifypy import Notify
 import requests
 
@@ -59,6 +60,7 @@ def check_battery_level():
             messageNotif = f"⚠️ Nivel de batería bajo ({level} %). \nConecta el cargador."
             send_notification(titleNotif, messageNotif)
             send_telegram_message(messageNotif)
+            playsound("sounds/battery-low.mp3")
             
             time.sleep(80)
         elif level >= 90 and plugged:
@@ -67,6 +69,7 @@ def check_battery_level():
             messageNotif = f"⚡ Batería casi llena ({level} %). \nConsidera desconectar el cargador."
             send_notification(titleNotif, messageNotif)
             send_telegram_message(messageNotif)
+            playsound("sounds/battery-high.mp3")
             
             time.sleep(80)
     else:
