@@ -13,6 +13,7 @@ from notifypy import Notify
 import requests
 import signal
 import sys
+import argparse
 
 # Librarías para evitar mostrar información sensible en el código
 from dotenv import load_dotenv
@@ -20,6 +21,16 @@ import os
 
 # Carga las variables de entorno del archivo .env
 load_dotenv()
+
+# Carga analizador de argumentos
+parser = argparse.ArgumentParser(description = "Programa que checa el nivel de la batería")
+
+# Añadir argumentos
+parser.add_argument("--lower", type = int, help = "El límite inferior permitido para la batería", default = 20)
+parser.add_argument("--higher", type = int, help = "El límite superior permitido para la batería", default = 90)
+parser.add_argument("--sound", type = bool, help="Valor para habilitar o deshabilitar los sonidos", default = True)
+parser.add_argument("--closing", type = bool, help="Valor para habilitar o deshabilitar el aviso de cierre del programa", default = True)
+args = parser.parse_args()
 
 # Accede a las variables de entorno
 TOKEN = os.getenv("TOKEN")
@@ -50,14 +61,15 @@ def send_notification(title, message):
 
 # Función que revisa cuando el archivo está por ser interrumpido (para las suspensiones y apagados)
 def handle_interrupt(signal_received, frame):
-    battery = psutil.sensors_battery()
-    level = battery.percent
-    plugged = battery.power_plugged
-    if plugged == True:
-        messageNotif = f"⚡ El programa dejará de monitorear el nivel de batería ({level} %). Desenchufar"
-    else:
-        messageNotif = f"⚡ El programa dejará de monitorear el nivel de batería ({level} %)."
-    send_telegram_message(messageNotif)
+    if args.closing == True:
+        battery = psutil.sensors_battery()
+        level = battery.percent
+        plugged = battery.power_plugged
+        if plugged == True:
+            messageNotif = f"ℹ️ El programa dejará de monitorear el nivel de batería ({level} %). Desenchufar"
+        else:
+            messageNotif = f"ℹ️ El programa dejará de monitorear el nivel de batería ({level} %)."
+        send_telegram_message(messageNotif)
     sys.exit(0)
 
 # Función general que revisa el estado de la batería
@@ -69,21 +81,23 @@ def check_battery_level():
         plugged = battery.power_plugged
         
         # Verificar el nivel de la batería y si está conectada a la corriente
-        if level <= 20 and not plugged:
+        if level <= args.lower and not plugged:
             titleNotif = "Alerta de Batería"
             messageNotif = f"⚠️ Nivel de batería bajo ({level} %). \nConecta el cargador."
             send_notification(titleNotif, messageNotif)
             send_telegram_message(messageNotif)
-            playsound("sounds/battery-low.mp3")
+            if args.sound == True:
+                playsound("sounds/battery-low.mp3")
             
             time.sleep(80)
-        elif level >= 90 and plugged:
+        elif level >= args.higher and plugged:
             #Envia notificacion de sistema
             titleNotif = "Alerta de Batería"
             messageNotif = f"⚡ Batería casi llena ({level} %). \nConsidera desconectar el cargador."
             send_notification(titleNotif, messageNotif)
             send_telegram_message(messageNotif)
-            playsound("sounds/battery-high.mp3")
+            if args.sound == True:
+                playsound("sounds/battery-high.mp3")
             
             time.sleep(80)
     else:
@@ -99,4 +113,5 @@ def main():
 if __name__ == "__main__":
     # Configuramos el manejador para la señal SIGINT
     signal.signal(signal.SIGINT, handle_interrupt)
+    signal.signal(signal.SIGTERM, handle_interrupt)
     main()
