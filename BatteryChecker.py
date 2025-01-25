@@ -28,8 +28,8 @@ parser = argparse.ArgumentParser(description = "Programa que checa el nivel de l
 # Añadir argumentos
 parser.add_argument("--lower", type = int, help = "El límite inferior permitido para la batería", default = 20)
 parser.add_argument("--higher", type = int, help = "El límite superior permitido para la batería", default = 90)
-parser.add_argument("--sound", type = bool, help="Valor para habilitar o deshabilitar los sonidos", default = True)
-parser.add_argument("--closing", type = bool, help="Valor para habilitar o deshabilitar el aviso de cierre del programa", default = True)
+parser.add_argument("--sound", type=str, choices=["True", "False"], help="Valor para habilitar o deshabilitar los sonidos", default = "True")
+parser.add_argument("--closing", type=str, choices=["True", "False"], help="Valor para habilitar o deshabilitar el aviso de cierre del programa", default = "True")
 args = parser.parse_args()
 
 # Accede a las variables de entorno
@@ -45,12 +45,15 @@ def send_telegram_message(message):
         "chat_id": CHAT_ID,
         "text": message
     }
-
-    response = requests.post(url, json=payload)
-    if response.status_code != 200:
-        print("Error al enviar mensaje:", response.text)
-#    else:
-#        print("Mensaje enviado a Telegram con éxito.")        
+    
+    try:
+        requests.post(url, json=payload)
+    except requests.ConnectionError as e:
+        print(f"Error de conexión: {e}")
+    except requests.Timeout as e:
+        print(f"Error de tiempo de espera: {e}")
+    except requests.RequestException as e:
+        print(f"Error general de requests: {e}")
 
 # Función que manda la notificacion de sistema en PC
 def send_notification(title, message):
@@ -61,7 +64,7 @@ def send_notification(title, message):
 
 # Función que revisa cuando el archivo está por ser interrumpido (para las suspensiones y apagados)
 def handle_interrupt(signal_received, frame):
-    if args.closing == True:
+    if args.closing == "True":
         battery = psutil.sensors_battery()
         level = battery.percent
         plugged = battery.power_plugged
@@ -86,8 +89,15 @@ def check_battery_level():
             messageNotif = f"⚠️ Nivel de batería bajo ({level} %). \nConecta el cargador."
             send_notification(titleNotif, messageNotif)
             send_telegram_message(messageNotif)
-            if args.sound == True:
-                playsound(os.path.join(os.path.dirname(os.path.abspath(__file__)), "sounds", "battery-low.mp3"))
+            if args.sound == "True":
+                try:
+                    playsound(os.path.join(os.path.dirname(os.path.abspath(__file__)), "sounds", "battery-low.mp3"))
+                except FileNotFoundError as e:
+                    print(f"Error: {e}")
+                except PermissionError:
+                    print("Error: No tienes permisos para acceder al archivo.")
+                except Exception as e:
+                    print(f"Ocurrió un error inesperado: {e}")
             
             time.sleep(80)
         elif level >= args.higher and plugged:
@@ -95,8 +105,15 @@ def check_battery_level():
             messageNotif = f"⚡ Batería casi llena ({level} %). \nConsidera desconectar el cargador."
             send_notification(titleNotif, messageNotif)
             send_telegram_message(messageNotif)
-            if args.sound == True:
-                playsound(os.path.join(os.path.dirname(os.path.abspath(__file__)), "sounds", "battery-high.mp3"))
+            if args.sound == "True":
+                try:
+                    playsound(os.path.join(os.path.dirname(os.path.abspath(__file__)), "sounds", "battery-high.mp3"))
+                except FileNotFoundError as e:
+                    print(f"Error: {e}")
+                except PermissionError:
+                    print("Error: No tienes permisos para acceder al archivo.")
+                except Exception as e:
+                    print(f"Ocurrió un error inesperado: {e}")
             
             time.sleep(80)
     else:
