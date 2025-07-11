@@ -1,0 +1,7 @@
+{
+    "lower":20,
+    "higher":90,
+    "sound":false,
+    "closing":true,
+    "msgTelegram":true
+}

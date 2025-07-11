@@ -13,7 +13,7 @@ from notifypy import Notify
 import requests
 import signal
 import sys
-import argparse
+import json
 
 # Librarías para evitar mostrar información sensible en el código
 from dotenv import load_dotenv
@@ -22,15 +22,16 @@ import os
 # Carga las variables de entorno del archivo .env
 load_dotenv()
 
-# Carga analizador de argumentos
-parser = argparse.ArgumentParser(description = "Programa que checa el nivel de la batería")
-
-# Añadir argumentos
-parser.add_argument("--lower", type = int, help = "El límite inferior permitido para la batería", default = 20)
-parser.add_argument("--higher", type = int, help = "El límite superior permitido para la batería", default = 90)
-parser.add_argument("--sound", type=str, choices=["True", "False"], help="Valor para habilitar o deshabilitar los sonidos", default = "True")
-parser.add_argument("--closing", type=str, choices=["True", "False"], help="Valor para habilitar o deshabilitar el aviso de cierre del programa", default = "True")
-args = parser.parse_args()
+# Se accede a la información del json y se guardas su infomación
+try:
+    with open('conf.json', 'r') as file:
+        args = json.load(file)
+except FileNotFoundError:
+    print("Error: The file was not found.")
+    sys.exit(1)
+except json.JSONDecodeError:
+    print("Error: The file is not a valid JSON.")
+    sys.exit(1)
 
 # Accede a las variables de entorno
 TOKEN = os.getenv("TOKEN")
@@ -40,20 +41,21 @@ CHAT_ID = os.getenv("CHAT_ID")
 
 # Función que manda mansaje a través de Telegram
 def send_telegram_message(message):
-    url = "https://api.telegram.org/bot" + str(TOKEN) + "/sendMessage"
-    payload = {
-        "chat_id": CHAT_ID,
-        "text": message
-    }
-    
-    try:
-        requests.post(url, json=payload)
-    except requests.ConnectionError as e:
-        print(f"Error de conexión: {e}")
-    except requests.Timeout as e:
-        print(f"Error de tiempo de espera: {e}")
-    except requests.RequestException as e:
-        print(f"Error general de requests: {e}")
+    if args['msgTelegram']:
+        url = "https://api.telegram.org/bot" + str(TOKEN) + "/sendMessage"
+        payload = {
+            "chat_id": CHAT_ID,
+            "text": message
+        }
+        
+        try:
+            requests.post(url, json=payload)
+        except requests.ConnectionError as e:
+            print(f"Error de conexión: {e}")
+        except requests.Timeout as e:
+            print(f"Error de tiempo de espera: {e}")
+        except requests.RequestException as e:
+            print(f"Error general de requests: {e}")
 
 # Función que manda la notificacion de sistema en PC
 def send_notification(title, message):
@@ -62,9 +64,21 @@ def send_notification(title, message):
     notification.message = message
     notification.send()
 
+# Función que reproduce el sonido para la notifiaciones de sistema en PC
+def play_notification_sound(sound_file_name):
+    if args['sound']:
+        try:
+            playsound(os.path.join(os.path.dirname(os.path.abspath(__file__)), "sounds", sound_file_name))
+        except FileNotFoundError as e:
+            print(f"Error: {e}")
+        except PermissionError:
+            print("Error: No tienes permisos para acceder al archivo.")
+        except Exception as e:
+            print(f"Ocurrió un error inesperado: {e}")
+
 # Función que revisa cuando el archivo está por ser interrumpido (para las suspensiones y apagados)
 def handle_interrupt(signal_received, frame):
-    if args.closing == "True":
+    if args['closing']:
         battery = psutil.sensors_battery()
         level = battery.percent
         plugged = battery.power_plugged
@@ -84,36 +98,20 @@ def check_battery_level():
         plugged = battery.power_plugged
         
         # Verificar el nivel de la batería y si está conectada a la corriente
-        if level <= args.lower and not plugged:
+        if level <= args['lower'] and not plugged:
             titleNotif = "Alerta de Batería"
             messageNotif = f"⚠️ Nivel de batería bajo ({level} %). \nConecta el cargador."
             send_notification(titleNotif, messageNotif)
             send_telegram_message(messageNotif)
-            if args.sound == "True":
-                try:
-                    playsound(os.path.join(os.path.dirname(os.path.abspath(__file__)), "sounds", "battery-low.mp3"))
-                except FileNotFoundError as e:
-                    print(f"Error: {e}")
-                except PermissionError:
-                    print("Error: No tienes permisos para acceder al archivo.")
-                except Exception as e:
-                    print(f"Ocurrió un error inesperado: {e}")
+            play_notification_sound("battery-low.mp3")
             
             time.sleep(80)
-        elif level >= args.higher and plugged:
+        elif level >= args['higher'] and plugged:
             titleNotif = "Alerta de Batería"
             messageNotif = f"⚡ Batería casi llena ({level} %). \nConsidera desconectar el cargador."
             send_notification(titleNotif, messageNotif)
             send_telegram_message(messageNotif)
-            if args.sound == "True":
-                try:
-                    playsound(os.path.join(os.path.dirname(os.path.abspath(__file__)), "sounds", "battery-high.mp3"))
-                except FileNotFoundError as e:
-                    print(f"Error: {e}")
-                except PermissionError:
-                    print("Error: No tienes permisos para acceder al archivo.")
-                except Exception as e:
-                    print(f"Ocurrió un error inesperado: {e}")
+            play_notification_sound("battery-high.mp3")
             
             time.sleep(80)
     else:
