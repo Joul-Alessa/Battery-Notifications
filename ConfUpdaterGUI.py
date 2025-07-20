@@ -1,3 +1,4 @@
+import os
 import json
 import toga
 from toga.style import Pack
@@ -6,6 +7,16 @@ from toga.style.pack import COLUMN, ROW
 
 class NotificationsApp(toga.App):
     def startup(self):
+        # Obtener el directorio actual y verificar si carpeta sounds existe
+        current_directory = os.path.dirname(os.path.abspath(__file__))
+        sounds_directory = os.path.join(current_directory, 'sounds')
+
+        if not os.path.exists(sounds_directory):
+            os.makedirs(sounds_directory)
+            print("Carpeta 'sounds' creada.")
+        else:
+            print("La carpeta 'sounds' ya existe.")
+        
         # Leer valores desde conf.json
         try:
             with open("conf.json", "r") as f:
@@ -81,35 +92,62 @@ class NotificationsApp(toga.App):
         main_box.add(title_2_label)
 
         # Fila con Enable, low/high y botones select
-        input_row_2 = toga.Box(
+        self.input_row_2 = toga.Box(
             style=Pack(direction=ROW, gap=10, flex=1, alignment="center", justify_content="center")
         )
 
+        # Primer grupo: Enable + Switch (una fila horizontal)
+        enable_group = toga.Box(style=Pack(direction=ROW, gap=10))
         enable_sounds_label = toga.Label("Enable sounds notifications:", style=Pack(padding=(5, 0)))
         self.enable_sounds_checkbox = toga.Switch(
             "",
             style=Pack(),
+            on_change=self.toggle_sounds_fields,
             value=default_sound_enabled_json
         )
+        enable_group.add(enable_sounds_label)
+        enable_group.add(self.enable_sounds_checkbox)
 
+        # Segundo grupo: bloque vertical con filas individuales para cada sonido
+        self.sound_column = toga.Box(style=Pack(direction=COLUMN, gap=5))
+
+        # Fila: Low
+        low_row = toga.Box(style=Pack(direction=ROW, gap=10))
         low_sound_label = toga.Label("Low battery sound:", style=Pack(padding=(5, 0)))
         self.low_sound_button = toga.Button("Select", on_press=self.on_select_low, style=Pack())
+        low_row.add(low_sound_label)
+        low_row.add(self.low_sound_button)
 
+        # Fila: High
+        high_row = toga.Box(style=Pack(direction=ROW, gap=10))
         high_sound_label = toga.Label("High battery sound:", style=Pack(padding=(5, 0)))
         self.high_sound_button = toga.Button("Select", on_press=self.on_select_high, style=Pack())
+        high_row.add(high_sound_label)
+        high_row.add(self.high_sound_button)
 
-        input_row_2.add(enable_sounds_label)
-        input_row_2.add(self.enable_sounds_checkbox)
-        input_row_2.add(low_sound_label)
-        input_row_2.add(self.low_sound_button)
-        input_row_2.add(high_sound_label)
-        input_row_2.add(self.high_sound_button)
+        # Fila: Disconnect
+        disconnect_row = toga.Box(style=Pack(direction=ROW, gap=10))
+        disconnect_sound_label = toga.Label("Turn off the service sound:", style=Pack(padding=(5, 0)))
+        self.disconnect_sound_button = toga.Button("Select", on_press=self.on_select_high, style=Pack())
+        disconnect_row.add(disconnect_sound_label)
+        disconnect_row.add(self.disconnect_sound_button)
+
+        # Agregar las filas al bloque vertical
+        self.sound_column.add(low_row)
+        self.sound_column.add(high_row)
+        self.sound_column.add(disconnect_row)
+
+        # Agregar los grupos a la fila principal
+        self.input_row_2.add(enable_group)
+
+        if default_sound_enabled_json:
+            self.input_row_2.add(self.sound_column)
 
         # Envolver la fila en otro contenedor para centrarla
         centered_row_2_box = toga.Box(
             style=Pack(direction=ROW, justify_content="center")
         )
-        centered_row_2_box.add(input_row_2)
+        centered_row_2_box.add(self.input_row_2)
 
         # Agregar fila a la ventana principal
         main_box.add(centered_row_2_box)
@@ -227,6 +265,12 @@ class NotificationsApp(toga.App):
 
     def on_select_high(self, widget):
         print("High sound selected")
+    
+    def toggle_sounds_fields(self, widget):
+        if widget.value:
+            self.input_row_2.add(self.sound_column)
+        else:
+            self.input_row_2.remove(self.sound_column)
     
     def toggle_telegram_fields(self, widget):
         if widget.value:
