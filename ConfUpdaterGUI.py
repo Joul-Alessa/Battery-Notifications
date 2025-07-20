@@ -15,6 +15,8 @@ class NotificationsApp(toga.App):
                 default_sound_enabled_json = config.get("sound", False)
                 default_closing_notif_json = config.get("closing", True)
                 default_msg_telegram_json = config.get("msgTelegram", False)
+                default_chat_id_telegram_json = config.get("chatIdTelegram", "")
+                default_bot_id_telegram_json = config.get("botIdTelegram", "")
         except Exception as e:
             print("Error leyendo conf.json:", e)
             default_min_json = "0"
@@ -22,6 +24,8 @@ class NotificationsApp(toga.App):
             default_sound_enabled_json = False
             default_closing_notif_json = True
             default_msg_telegram_json = False
+            default_chat_id_telegram_json = ""
+            default_bot_id_telegram_json = ""
         
         # Contenedor principal
         main_box = toga.Box(style=Pack(direction=COLUMN, margin=10))
@@ -158,11 +162,13 @@ class NotificationsApp(toga.App):
 
         chat_id_label = toga.Label("Chat ID:", style=Pack(width=90))
         self.chat_id_input = toga.TextInput(
+            value=default_chat_id_telegram_json,
             style=Pack(width=100)
         )
 
         telegram_bot_label = toga.Label("Telegram Bot:", style=Pack(width=90))
         self.telegram_bot_input = toga.TextInput(
+            value=default_bot_id_telegram_json,
             style=Pack(width=100)
         )
 
@@ -175,7 +181,9 @@ class NotificationsApp(toga.App):
         self.centered_row_4_box = toga.Box(
             style=Pack(direction=ROW, justify_content="center")
         )
-        self.centered_row_4_box.add(self.input_row_4)
+        
+        if default_msg_telegram_json:
+            self.centered_row_4_box.add(self.input_row_4)
 
         # Agregar fila a la ventana principal
         main_box.add(self.centered_row_4_box)
@@ -193,7 +201,7 @@ class NotificationsApp(toga.App):
 
         # Envolver la fila en otro contenedor para centrarla
         centered_row_5_box = toga.Box(
-            style=Pack(direction=ROW, justify_content="center")
+            style=Pack(direction=ROW, justify_content="center", margin_top=10)
         )
         centered_row_5_box.add(input_row_5)
 
