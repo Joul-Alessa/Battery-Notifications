@@ -304,14 +304,14 @@ class NotificationsApp(toga.App):
                     try:
                         os.remove(dest_path)
                     except Exception as e:
-                        print(f"No se pudo eliminar el archivo existente: {e}")
+                        print("No se pudo eliminar el archivo existente: " + str(e))
                         return
 
                 # Copiar y sobreescribir si ya existe
                 shutil.copyfile(file_path, dest_path)
-                print(f"Archivo copiado como: {dest_path}")
+                print("Archivo copiado como: " + str(dest_path))
             except Exception as e:
-                print(f"Error al copiar el archivo: {e}")
+                print("Error al copiar el archivo: " + str(e))
     
     def toggle_sounds_fields(self, widget):
         if widget.value:
@@ -336,7 +336,7 @@ class NotificationsApp(toga.App):
             try:
                 playsound(filename)
             except Exception as e:
-                print(f"Error al reproducir sonido: {e}")
+                print("Error al reproducir sonido: " + str(e))
 
         # Ejecutar en hilo para no bloquear la interfaz
         threading.Thread(target=_play, daemon=True).start()
