@@ -2,6 +2,8 @@ import os
 import json
 import toga
 import shutil
+from playsound import playsound
+import threading
 from toga.style import Pack
 from toga.style.pack import COLUMN, ROW
 
@@ -112,12 +114,20 @@ class NotificationsApp(toga.App):
         # Segundo grupo: bloque vertical con filas individuales para cada sonido
         self.sound_column = toga.Box(style=Pack(direction=COLUMN, gap=5))
 
+        # Verifica y añade botones para reproducir sonidos existentes
+        low_sound_path = os.path.join(sounds_directory, "battery-low.mp3")
+        high_sound_path = os.path.join(sounds_directory, "battery-high.mp3")
+        disconnect_sound_path = os.path.join(sounds_directory, "disconnect.mp3")
+
         # Fila: Low
         low_row = toga.Box(style=Pack(direction=ROW, gap=10))
         low_sound_label = toga.Label("Low battery sound:", style=Pack(padding=(5, 0)))
         self.low_sound_button = toga.Button("Select", on_press=self.on_select_low, style=Pack())
         low_row.add(low_sound_label)
         low_row.add(self.low_sound_button)
+        if os.path.exists(low_sound_path):
+            play_low_button = toga.Button("▶", on_press=lambda w: self.play_sound(low_sound_path), style=Pack(width=40))
+            low_row.add(play_low_button)
 
         # Fila: High
         high_row = toga.Box(style=Pack(direction=ROW, gap=10))
@@ -125,6 +135,9 @@ class NotificationsApp(toga.App):
         self.high_sound_button = toga.Button("Select", on_press=self.on_select_high, style=Pack())
         high_row.add(high_sound_label)
         high_row.add(self.high_sound_button)
+        if os.path.exists(high_sound_path):
+            play_high_button = toga.Button("▶", on_press=lambda w: self.play_sound(high_sound_path), style=Pack(width=40))
+            high_row.add(play_high_button)
 
         # Fila: Disconnect
         disconnect_row = toga.Box(style=Pack(direction=ROW, gap=10))
@@ -132,6 +145,9 @@ class NotificationsApp(toga.App):
         self.disconnect_sound_button = toga.Button("Select", on_press=self.on_select_disconnect, style=Pack())
         disconnect_row.add(disconnect_sound_label)
         disconnect_row.add(self.disconnect_sound_button)
+        if os.path.exists(disconnect_sound_path):
+            play_disconnect_button = toga.Button("▶", on_press=lambda w: self.play_sound(disconnect_sound_path), style=Pack(width=40))
+            disconnect_row.add(play_disconnect_button)
 
         # Agregar las filas al bloque vertical
         self.sound_column.add(low_row)
@@ -261,18 +277,18 @@ class NotificationsApp(toga.App):
         elif int(value) > 100:
             widget.value = "100"
     
-    def on_select_low(self, widget):
-        self.select_and_copy_sound("battery-low.mp3")
+    async def on_select_low(self, widget):
+        await self.select_and_copy_sound("battery-low.mp3")
 
-    def on_select_high(self, widget):
-        self.select_and_copy_sound("battery-high.mp3")
+    async def on_select_high(self, widget):
+        await self.select_and_copy_sound("battery-high.mp3")
     
-    def on_select_disconnect(self, widget):
-        self.select_and_copy_sound("disconnect.mp3")
+    async def on_select_disconnect(self, widget):
+        await self.select_and_copy_sound("disconnect.mp3")
     
-    def select_and_copy_sound(self, target_filename):
+    async def select_and_copy_sound(self, target_filename):
         # Abrir el explorador de archivos
-        file_path = self.main_window.open_file_dialog(
+        file_path = await self.main_window.open_file_dialog(
             title="Selecciona un archivo de sonido",
             file_types=["mp3"]
         )
@@ -283,6 +299,13 @@ class NotificationsApp(toga.App):
                 current_directory = os.path.dirname(os.path.abspath(__file__))
                 sounds_directory = os.path.join(current_directory, 'sounds')
                 dest_path = os.path.join(sounds_directory, target_filename)
+
+                if os.path.exists(dest_path):
+                    try:
+                        os.remove(dest_path)
+                    except Exception as e:
+                        print(f"No se pudo eliminar el archivo existente: {e}")
+                        return
 
                 # Copiar y sobreescribir si ya existe
                 shutil.copyfile(file_path, dest_path)
@@ -307,6 +330,16 @@ class NotificationsApp(toga.App):
     
     def on_cancel(self, widget):
         print("on_cancel")
+    
+    def play_sound(self, filename):
+        def _play():
+            try:
+                playsound(filename)
+            except Exception as e:
+                print(f"Error al reproducir sonido: {e}")
+
+        # Ejecutar en hilo para no bloquear la interfaz
+        threading.Thread(target=_play, daemon=True).start()
 
 
 def main():
