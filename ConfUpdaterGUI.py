@@ -1,6 +1,7 @@
 import os
 import json
 import toga
+import shutil
 from toga.style import Pack
 from toga.style.pack import COLUMN, ROW
 
@@ -128,7 +129,7 @@ class NotificationsApp(toga.App):
         # Fila: Disconnect
         disconnect_row = toga.Box(style=Pack(direction=ROW, gap=10))
         disconnect_sound_label = toga.Label("Turn off the service sound:", style=Pack(padding=(5, 0)))
-        self.disconnect_sound_button = toga.Button("Select", on_press=self.on_select_high, style=Pack())
+        self.disconnect_sound_button = toga.Button("Select", on_press=self.on_select_disconnect, style=Pack())
         disconnect_row.add(disconnect_sound_label)
         disconnect_row.add(self.disconnect_sound_button)
 
@@ -261,10 +262,33 @@ class NotificationsApp(toga.App):
             widget.value = "100"
     
     def on_select_low(self, widget):
-        print("Low sound selected")
+        self.select_and_copy_sound("battery-low.mp3")
 
     def on_select_high(self, widget):
-        print("High sound selected")
+        self.select_and_copy_sound("battery-high.mp3")
+    
+    def on_select_disconnect(self, widget):
+        self.select_and_copy_sound("disconnect.mp3")
+    
+    def select_and_copy_sound(self, target_filename):
+        # Abrir el explorador de archivos
+        file_path = self.main_window.open_file_dialog(
+            title="Selecciona un archivo de sonido",
+            file_types=["mp3"]
+        )
+
+        if file_path:
+            try:
+                # Crear el path destino en la carpeta actual / sounds
+                current_directory = os.path.dirname(os.path.abspath(__file__))
+                sounds_directory = os.path.join(current_directory, 'sounds')
+                dest_path = os.path.join(sounds_directory, target_filename)
+
+                # Copiar y sobreescribir si ya existe
+                shutil.copyfile(file_path, dest_path)
+                print(f"Archivo copiado como: {dest_path}")
+            except Exception as e:
+                print(f"Error al copiar el archivo: {e}")
     
     def toggle_sounds_fields(self, widget):
         if widget.value:
