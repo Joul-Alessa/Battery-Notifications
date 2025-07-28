@@ -3,5 +3,8 @@
     "higher":90,
     "sound":false,
     "closing":true,
-    "msgTelegram":true
+    "msgTelegram":true,
+    "chatIdTelegram":"asdfg",
+    "botIdTelegram":"ñlkjh",
+    "sleepTime": "60"
 }
