@@ -31,6 +31,8 @@ class NotificationsApp(toga.App):
                 default_msg_telegram_json = config.get("msgTelegram", False)
                 default_chat_id_telegram_json = config.get("chatIdTelegram", "")
                 default_bot_id_telegram_json = config.get("botIdTelegram", "")
+                default_sleep_time_json = config.get("sleepTime", "")
+                default_port_json = config.get("port", "")
         except Exception as e:
             print("Error leyendo conf.json:", e)
             default_min_json = "0"
@@ -40,6 +42,8 @@ class NotificationsApp(toga.App):
             default_msg_telegram_json = False
             default_chat_id_telegram_json = ""
             default_bot_id_telegram_json = ""
+            default_sleep_time_json = "60"
+            default_port_json = "1111"
         
         # Contenedor principal
         main_box = toga.Box(style=Pack(direction=COLUMN, margin=10))
@@ -210,7 +214,7 @@ class NotificationsApp(toga.App):
         # Agregar fila a la ventana principal
         main_box.add(centered_row_3_box)
 
-        # Fila con para eventos misceláneos opcionales
+        # Fila para eventos misceláneos opcionales
         self.input_row_4 = toga.Box(
             style=Pack(direction=ROW, gap=10, flex=1, alignment="center", justify_content="center")
         )
@@ -243,25 +247,58 @@ class NotificationsApp(toga.App):
         # Agregar fila a la ventana principal
         main_box.add(self.centered_row_4_box)
 
+        # Fila para la configuración de sleep y puertos
+        self.input_row_5 = toga.Box(
+            style=Pack(direction=ROW, gap=10, flex=1, alignment="center", justify_content="center")
+        )
+
+        sleep_time_label = toga.Label("Sleep time:", style=Pack(width=90))
+        self.sleep_time_input = toga.TextInput(
+            value=default_sleep_time_json,
+            style=Pack(width=100)
+        )
+
+        port_label = toga.Label("Port:", style=Pack(width=90))
+        self.port_input = toga.TextInput(
+            value=default_port_json,
+            style=Pack(width=100)
+        )
+
+        self.input_row_5.add(sleep_time_label)
+        self.input_row_5.add(self.sleep_time_input)
+        self.input_row_5.add(port_label)
+        self.input_row_5.add(self.port_input)
+
+        # Envolver la fila en otro contenedor para centrarla
+        self.centered_row_5_box = toga.Box(
+            style=Pack(direction=ROW, justify_content="center")
+        )
+        
+        if default_msg_telegram_json:
+            self.centered_row_5_box.add(self.input_row_5)
+
+        # Agregar fila a la ventana principal
+        main_box.add(self.centered_row_5_box)
+
         # Fila de botones para guardar el contenido
-        input_row_5 = toga.Box(
+        input_row_6 = toga.Box(
             style=Pack(direction=ROW, gap=10, flex=1, alignment="center", justify_content="center")
         )
 
         self.accept_button = toga.Button("Aceptar", on_press=self.on_accept, style=Pack(width=100))
         self.cancel_button = toga.Button("Cancelar", on_press=self.on_cancel, style=Pack(width=100))
 
-        input_row_5.add(self.accept_button)
-        input_row_5.add(self.cancel_button)
+        input_row_6.add(self.accept_button)
+        input_row_6.add(self.cancel_button)
 
         # Envolver la fila en otro contenedor para centrarla
-        centered_row_5_box = toga.Box(
+        centered_row_6_box = toga.Box(
             style=Pack(direction=ROW, justify_content="center", margin_top=10)
         )
-        centered_row_5_box.add(input_row_5)
+        centered_row_6_box.add(input_row_6)
 
         # Agregar fila a la ventana principal
-        main_box.add(centered_row_5_box)
+        main_box.add(centered_row_6_box)
 
 
         # Mostrar ventana
@@ -340,7 +377,38 @@ class NotificationsApp(toga.App):
 
         # Ejecutar en hilo para no bloquear la interfaz
         threading.Thread(target=_play, daemon=True).start()
+    
+    async def on_accept(self, widget):
+        try:
+            self.save_config()
+            print("Configuration saved successfully.")
+            self.main_window.close()
+        except Exception as e:
+            print("Error saving configuration:", e)
+            await self.main_window.info_dialog("Error", "Error saving configuration: " + str(e))
+            self.main_window.close()
 
+    def save_config(self):
+        config_data = {
+            "lower": int(self.min_percentage_input.value) if self.min_percentage_input.value.isdigit() else 0,
+            "higher": int(self.max_percentage_input.value) if self.max_percentage_input.value.isdigit() else 100,
+            "sound": self.enable_sounds_checkbox.value,
+            "closing": self.closing_notif_checkbox.value,
+            "msgTelegram": self.telegram_checkbox.value,
+            "chatIdTelegram": self.chat_id_input.value,
+            "botIdTelegram": self.telegram_bot_input.value,
+            "sleepTime": self.sleep_time_input.value,
+            "port": self.port_input.value
+        }
+
+        current_directory = os.path.dirname(os.path.abspath(__file__))
+        config_path = os.path.join(current_directory, "conf.json")
+
+        with open(config_path, "w", encoding="utf-8") as f:
+            json.dump(config_data, f, indent=4, ensure_ascii=False)
+
+    def on_cancel(self, widget):
+        self.main_window.close()
 
 def main():
     return NotificationsApp("NotificationsApp", "org.example.notifications")
