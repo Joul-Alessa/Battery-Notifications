@@ -40,15 +40,21 @@ class BatteryChecker(SMWinservice):
     TOKEN = ""
     CHAT_ID = ""
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    _instance = None 
+
+    def __new__(cls, *args, **kwargs):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
 
     def start(self):
         # Carga las variables de entorno del archivo .env
-        load_dotenv(os.path.join(BatteryChecker.BASE_DIR, ".env"))
+        load_dotenv(os.path.join(self.BASE_DIR, ".env"))
 
         # Se accede a la información del json y se guardas su infomación
         try:
-            with open(os.path.join(BatteryChecker.BASE_DIR, 'conf.json'), 'r') as file:
-                BatteryChecker.args = json.load(file)
+            with open(os.path.join(self.BASE_DIR, 'conf.json'), 'r') as file:
+                self.args = json.load(file)
         except FileNotFoundError:
             print("Error: The file was not found.")
             sys.exit(1)
@@ -57,8 +63,8 @@ class BatteryChecker(SMWinservice):
             sys.exit(1)
 
         # Accede a las variables de entorno
-        BatteryChecker.TOKEN = os.getenv("TOKEN")
-        BatteryChecker.CHAT_ID = os.getenv("CHAT_ID")
+        self.TOKEN = os.getenv("TOKEN")
+        self.CHAT_ID = os.getenv("CHAT_ID")
         self.isrunning = True
     
     def restart(self):
@@ -68,7 +74,7 @@ class BatteryChecker(SMWinservice):
     # Función que revisa cuando el archivo está por ser interrumpido (para las suspensiones y apagados)
     def stop(self):
         self.isrunning = False
-        if BatteryChecker.args['closing']:
+        if self.args['closing']:
             battery = psutil.sensors_battery()
             level = battery.percent
             plugged = battery.power_plugged
@@ -80,38 +86,49 @@ class BatteryChecker(SMWinservice):
 
     # ciclo para revisar el nivel de la batería por medio de eventos
     def main(self):
-        detection = False
         while self.isrunning:
-            if (detection):
-                time.sleep(BatteryChecker.args['sleepTime'])
-                detection = False
-            else:
-                pythoncom.PumpWaitingMessages()  # Necesario para el hilo COM
-                battery = watcher()  # Espera evento
-                level = battery.EstimatedChargeRemaining
-                status = battery.BatteryStatus  # 1 = descargando, 2 = cargando,
+            try:
+                pythoncom.PumpWaitingMessages()  
+                battery = watcher(timeout_ms=1000)  # Espera evento
 
-                if level <= BatteryChecker.args['lower'] and status == 1:
-                    titleNotif = "Alerta de Batería"
+                if battery is None:
+                    continue
+                
+                level = battery.EstimatedChargeRemaining
+                status = battery.BatteryStatus  # 1 = descargando, 2 = cargando
+
+                
+
+                if level <= self.args['lower'] and status == 1:
                     messageNotif = f"⚠️ Nivel de batería bajo ({level} %). \nConecta el cargador."
-                    self.send_notification(titleNotif, messageNotif)
+                    self.send_notification("Alerta de Batería", messageNotif)
                     self.send_telegram_message(messageNotif)
                     self.play_notification_sound("battery-low.mp3")
-                    detection = True
-                elif level >= BatteryChecker.args['higher'] and status == 2:
-                    titleNotif = "Alerta de Batería"
+                    time.sleep(self.args['sleepTime'])
+                elif level >= self.args['higher'] and status == 2:
                     messageNotif = f"⚡ Batería casi llena ({level} %). \nConsidera desconectar el cargador."
-                    self.send_notification(titleNotif, messageNotif)
+                    self.send_notification("Alerta de Batería", messageNotif)
                     self.send_telegram_message(messageNotif)
                     self.play_notification_sound("battery-high.mp3")
-                    detection = True
+                    time.sleep(self.args['sleepTime'])
+            except pythoncom.com_error as e:
+                print(f"Error COM: {e} - Reiniciando monitor WMI")
+                self._restart_wmi_watcher()
+            except Exception as e:
+                print(f"Error inesperado: {e}")
+                time.sleep(5)
+
+    # Recuperación de errores WMI
+    def _restart_wmi_watcher(self):
+        pythoncom.CoInitialize()  # Reiniciar COM
+        self.watcher = c.watch_for(notification_type="Modification", wmi_class="Win32_Battery")
     
     # Función que manda mansaje a través de Telegram
     def send_telegram_message(self,message):
-        if BatteryChecker.args['msgTelegram']:
-            url = "https://api.telegram.org/bot" + str(BatteryChecker.TOKEN) + "/sendMessage"
+        if self.args['msgTelegram']:
+            url = "https://api.telegram.org/bot" + str(self.TOKEN) + "/sendMessage"
             payload = {
-                "chat_id": BatteryChecker.CHAT_ID,
+                "chat_id": self.CHAT_ID,
                 "text": message
             }
             
@@ -125,15 +142,15 @@ class BatteryChecker(SMWinservice):
                 print(f"Error general de requests: {e}")
 
     # Función que manda la notificacion de sistema en PC
-    def send_notification(title, message):
+    def send_notification(self,title, message):
         #Señal a la GUI para disparar la notificación con su información correspondiente
         wenas=0
 
     # Función que reproduce el sonido para la notifiaciones de sistema en PC
-    def play_notification_sound(sound_file_name):
-        if BatteryChecker.args['sound']:
+    def play_notification_sound(self,sound_file_name):
+        if self.args['sound']:
             try:
-                playsound(os.path.join(BatteryChecker.BASE_DIR, "sounds", sound_file_name))
+                playsound(os.path.join(self.BASE_DIR, "sounds", sound_file_name))
             except FileNotFoundError as e:
                 print(f"Error: {e}")
             except PermissionError:
