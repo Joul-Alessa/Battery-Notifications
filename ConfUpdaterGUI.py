@@ -431,8 +431,8 @@ class NotificationsApp(toga.App):
             "msgTelegram": self.telegram_checkbox.value,
             "chatIdTelegram": self.chat_id_input.value,
             "botIdTelegram": self.telegram_bot_input.value,
-            "sleepTime": self.sleep_time_input.value,
-            "port": self.port_input.value
+            "sleepTime": int(self.sleep_time_input.value),
+            "port": int(self.port_input.value)
         }
 
         current_directory = os.path.dirname(os.path.abspath(__file__))
