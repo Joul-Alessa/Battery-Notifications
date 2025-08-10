@@ -3,5 +3,6 @@
     "higher":90,
     "sound":false,
     "closing":true,
-    "msgTelegram":true
+    "msgTelegram":true,
+    "sleepTime":60
 }

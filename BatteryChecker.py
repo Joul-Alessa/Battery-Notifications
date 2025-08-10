@@ -14,12 +14,24 @@ import requests
 import sys
 import json
 from SMWinservice import SMWinservice
+import wmi
+import pythoncom
 
 # Librarías para evitar mostrar información sensible en el código
 from dotenv import load_dotenv
 import os
 
 #%% Código
+
+# Crear conexión WMI
+c = wmi.WMI()
+
+# Suscribirse a cambios en la clase Win32_Battery
+watcher = c.watch_for(
+    notification_type="Modification",
+    wmi_class="Win32_Battery"
+)
+
 class BatteryChecker(SMWinservice):
     _svc_name_ = "BatteryChecker"
     _svc_display_name_ = "Battery Notification Service"
@@ -66,11 +78,33 @@ class BatteryChecker(SMWinservice):
                 messageNotif = f"ℹ️ El programa dejará de monitorear el nivel de batería ({level} %)."
             self.send_telegram_message(messageNotif)
 
-    # ciclo para revisar el nivel de la batería
+    # ciclo para revisar el nivel de la batería por medio de eventos
     def main(self):
+        detection = False
         while self.isrunning:
-            self.check_battery_level()
-            time.sleep(10)  # Espera 10 segundos antes de volver a comprobar
+            if (detection):
+                time.sleep(BatteryChecker.args['sleepTime'])
+                detection = False
+            else:
+                pythoncom.PumpWaitingMessages()  # Necesario para el hilo COM
+                battery = watcher()  # Espera evento
+                level = battery.EstimatedChargeRemaining
+                status = battery.BatteryStatus  # 1 = descargando, 2 = cargando,
+
+                if level <= BatteryChecker.args['lower'] and status == 1:
+                    titleNotif = "Alerta de Batería"
+                    messageNotif = f"⚠️ Nivel de batería bajo ({level} %). \nConecta el cargador."
+                    self.send_notification(titleNotif, messageNotif)
+                    self.send_telegram_message(messageNotif)
+                    self.play_notification_sound("battery-low.mp3")
+                    detection = True
+                elif level >= BatteryChecker.args['higher'] and status == 2:
+                    titleNotif = "Alerta de Batería"
+                    messageNotif = f"⚡ Batería casi llena ({level} %). \nConsidera desconectar el cargador."
+                    self.send_notification(titleNotif, messageNotif)
+                    self.send_telegram_message(messageNotif)
+                    self.play_notification_sound("battery-high.mp3")
+                    detection = True
     
     # Función que manda mansaje a través de Telegram
     def send_telegram_message(self,message):
@@ -91,12 +125,12 @@ class BatteryChecker(SMWinservice):
                 print(f"Error general de requests: {e}")
 
     # Función que manda la notificacion de sistema en PC
-    def send_notification(self,title, message):
+    def send_notification(title, message):
         #Señal a la GUI para disparar la notificación con su información correspondiente
         wenas=0
 
     # Función que reproduce el sonido para la notifiaciones de sistema en PC
-    def play_notification_sound(self,sound_file_name):
+    def play_notification_sound(sound_file_name):
         if BatteryChecker.args['sound']:
             try:
                 playsound(os.path.join(BatteryChecker.BASE_DIR, "sounds", sound_file_name))
@@ -106,36 +140,6 @@ class BatteryChecker(SMWinservice):
                 print("Error: No tienes permisos para acceder al archivo.")
             except Exception as e:
                 print(f"Ocurrió un error inesperado: {e}")
-            
-
-    # Función general que revisa el estado de la batería
-    def check_battery_level(self):
-        # Obtener información de la batería
-        battery = psutil.sensors_battery()
-        if battery is not None:
-            level = battery.percent
-            plugged = battery.power_plugged
-            
-            # Verificar el nivel de la batería y si está conectada a la corriente
-            if level <= BatteryChecker.args['lower'] and not plugged:
-                titleNotif = "Alerta de Batería"
-                messageNotif = f"⚠️ Nivel de batería bajo ({level} %). \nConecta el cargador."
-                self.send_notification(titleNotif, messageNotif)
-                self.send_telegram_message(messageNotif)
-                self.play_notification_sound("battery-low.mp3")
-                
-                time.sleep(80)
-            elif level >= BatteryChecker.args['higher'] and plugged:
-                titleNotif = "Alerta de Batería"
-                messageNotif = f"⚡ Batería casi llena ({level} %). \nConsidera desconectar el cargador."
-                self.send_notification(titleNotif, messageNotif)
-                self.send_telegram_message(messageNotif)
-                self.play_notification_sound("battery-high.mp3")
-                
-                time.sleep(80)
-        else:
-            print("No se pudo obtener información sobre la batería.")
-            exit()
         
 
 if __name__ == '__main__':
