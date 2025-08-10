@@ -1,3 +1,7 @@
+'''
+Esta versión funciona bien pero al cerrar la ventana, el proceso se muere
+'''
+
 import os
 import json
 import toga
@@ -6,7 +10,18 @@ from playsound import playsound
 import threading
 from toga.style import Pack
 from toga.style.pack import COLUMN, ROW
+import socket
+import io
+import sys
+from PIL import Image, ImageDraw
+import pystray
 
+def create_image():
+    # Crea un icono básico para el tray
+    image = Image.new('RGB', (64, 64), (0, 0, 0))
+    draw = ImageDraw.Draw(image)
+    draw.rectangle((16, 16, 48, 48), fill=(255, 255, 255))
+    return image
 
 class NotificationsApp(toga.App):
     def startup(self):
@@ -302,9 +317,34 @@ class NotificationsApp(toga.App):
 
 
         # Mostrar ventana
-        self.main_window = toga.MainWindow(title=self.formal_name)
-        self.main_window.content = main_box
+        self.main_window = toga.App.BACKGROUND
+        self.settings_window = toga.Window(title=self.formal_name, size=(700, 500))
+        self.settings_window.content = main_box
+
+        self.settings_window.on_close = self._on_settings_close
+        self.windows.add(self.settings_window)
+    
+    def _on_settings_close(self, window, **kwargs):
+        # ocultar en vez de cerrar; devolver False para impedir que Toga destruya la ventana.
+        window.hide()
+        return False
+    
+    def show_settings_window(self):
+        # método que ejecutaremos desde el thread del tray mediante app.loop.call_soon_threadsafe
+        # si la ventana ya está cerrada/recreada, podrías comprobar y volver a crearla
+        self.settings_window.show()
+        # opcional: intentar dar foco
+        try:
+            self.settings_window.focus()
+        except Exception:
+            pass
+    
+    def show_window(self):
         self.main_window.show()
+
+    def hide_window(self, *args, **kwargs):
+        self.main_window.hide()
+        return True  # True = evitar que se cierre el app
     
     # Función para validar los inputs de las entradas y que solo se escriban números enteros entre 0 y 100
     def validate_input(self, widget):
@@ -362,12 +402,6 @@ class NotificationsApp(toga.App):
         else:
             self.centered_row_4_box.remove(self.input_row_4)
     
-    def on_accept(self, widget):
-        print("on_accept")
-    
-    def on_cancel(self, widget):
-        print("on_cancel")
-    
     def play_sound(self, filename):
         def _play():
             try:
@@ -382,11 +416,11 @@ class NotificationsApp(toga.App):
         try:
             self.save_config()
             print("Configuration saved successfully.")
-            self.main_window.close()
+            self.settings_window.hide()
         except Exception as e:
             print("Error saving configuration:", e)
-            await self.main_window.info_dialog("Error", "Error saving configuration: " + str(e))
-            self.main_window.close()
+            await self.settings_window.info_dialog("Error", "Error saving configuration: " + str(e))
+            self.settings_window.hide()
 
     def save_config(self):
         config_data = {
@@ -408,10 +442,47 @@ class NotificationsApp(toga.App):
             json.dump(config_data, f, indent=4, ensure_ascii=False)
 
     def on_cancel(self, widget):
-        self.main_window.close()
+        self.settings_window.hide()
 
-def main():
-    return NotificationsApp("NotificationsApp", "org.example.notifications")
+def tray_icon(app_instance):
+    def on_clicked(icon, item):
+        try:
+            app_instance.loop.call_soon_threadsafe(app_instance.show_settings_window)
+        except Exception as e:
+            print("Error al pedir mostrar la ventana:", e)
+
+    icon = pystray.Icon(
+        "test",
+        create_image(),
+        menu=pystray.Menu(
+            pystray.MenuItem('Mostrar ventana', on_clicked),
+            pystray.MenuItem('Salir', lambda icon, item: sys.exit())
+        )
+    )
+    icon.run()
+
+
+def socket_server():
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(('localhost', 5000))
+        s.listen()
+        print("Servidor escuchando en localhost:5000")
+        while True:
+            conn, addr = s.accept()
+            with conn:
+                data = conn.recv(1024)
+                if data:
+                    print("Mensaje recibido:", data.decode())
+                    conn.sendall(b"OK")
 
 if __name__ == "__main__":
-    main().main_loop()
+    app = NotificationsApp("NotificationsApp", "org.example.notifications")
+
+    # Iniciar servidor en segundo plano
+    threading.Thread(target=socket_server, daemon=True).start()
+
+    # Iniciar icono de bandeja en segundo plano
+    threading.Thread(target=tray_icon, args=(app,), daemon=True).start()
+
+    # Iniciar la app de Toga
+    app.main_loop()
