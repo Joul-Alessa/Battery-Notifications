@@ -15,6 +15,7 @@ import io
 import sys
 from PIL import Image, ImageDraw
 import pystray
+from notifypy import Notify
 
 def create_image():
     # Crea un icono básico para el tray
@@ -464,16 +465,27 @@ def tray_icon(app_instance):
 
 def socket_server():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(('localhost', 5000))
+        with open(os.path.join('conf.json'), 'r') as file:
+                args = json.load(file)
+        s.bind(('localhost', args['port']))
         s.listen()
-        print("Servidor escuchando en localhost:5000")
+        print(f"Servidor escuchando en localhost:{args['port']}")
         while True:
             conn, addr = s.accept()
             with conn:
                 data = conn.recv(1024)
                 if data:
-                    print("Mensaje recibido:", data.decode())
-                    conn.sendall(b"OK")
+                    try:
+                        notif = json.loads(data.decode('utf-8'))
+                        show_notification(notif['title'], notif['message'])
+                    except Exception as e:
+                        print("Error procesando notificación:", e)
+
+def show_notification(title, message):
+    notification = Notify()
+    notification.title = title
+    notification.message = message
+    notification.send()
 
 if __name__ == "__main__":
     app = NotificationsApp("NotificationsApp", "org.example.notifications")

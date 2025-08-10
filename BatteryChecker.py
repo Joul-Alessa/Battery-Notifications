@@ -16,6 +16,7 @@ import json
 from SMWinservice import SMWinservice
 import wmi
 import pythoncom
+import socket
 
 # Librarías para evitar mostrar información sensible en el código
 from dotenv import load_dotenv
@@ -144,7 +145,13 @@ class BatteryChecker(SMWinservice):
     # Función que manda la notificacion de sistema en PC
     def send_notification(self,title, message):
         #Señal a la GUI para disparar la notificación con su información correspondiente
-        wenas=0
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.connect(('localhost', self.args['port']))  # Puerto acordado
+                data = json.dumps({"title": title, "message": message})
+                s.sendall(data.encode('utf-8'))
+        except ConnectionRefusedError:
+            print("El cliente no está escuchando (sin GUI activa).")
 
     # Función que reproduce el sonido para la notifiaciones de sistema en PC
     def play_notification_sound(self,sound_file_name):
