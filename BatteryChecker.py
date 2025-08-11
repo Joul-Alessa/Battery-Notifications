@@ -127,9 +127,9 @@ class BatteryChecker(SMWinservice):
     # Función que manda mansaje a través de Telegram
     def send_telegram_message(self,message):
         if self.args['msgTelegram']:
-            url = "https://api.telegram.org/bot" + str(self.TOKEN) + "/sendMessage"
+            url = "https://api.telegram.org/bot" + str(self.args['botIdTelegram']) + "/sendMessage"
             payload = {
-                "chat_id": self.CHAT_ID,
+                "chat_id": self.args['chatIdTelegram'],
                 "text": message
             }
             
