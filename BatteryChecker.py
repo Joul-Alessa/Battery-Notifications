@@ -17,12 +17,24 @@ from SMWinservice import SMWinservice
 import wmi
 import pythoncom
 import socket
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
+import threading
 
 # Librarías para evitar mostrar información sensible en el código
 from dotenv import load_dotenv
 import os
 
 #%% Código
+
+class ConfigChangeHandler(FileSystemEventHandler):
+    def __init__(self, service):
+        self.service = service
+
+    def on_modified(self, event):
+        if event.src_path.endswith("conf.json"):
+            print("⚙️ Se detectó un cambio en conf.json, recargando configuración...")
+            self.service.reload_config()
 
 class BatteryChecker(SMWinservice):
     _svc_name_ = "BatteryChecker"
@@ -45,6 +57,9 @@ class BatteryChecker(SMWinservice):
 
         pythoncom.CoInitialize()
         self._restart_wmi_watcher()
+        self.load_config()
+        self.start_config_watcher()
+        self.isrunning = True
 
         # Se accede a la información del json y se guardas su infomación
         try:
@@ -62,6 +77,30 @@ class BatteryChecker(SMWinservice):
         self.CHAT_ID = os.getenv("CHAT_ID")
         self.isrunning = True
     
+    def load_config(self):
+        """Carga el archivo conf.json y guarda sus valores en self.args"""
+        try:
+            with open(os.path.join(self.BASE_DIR, 'conf.json'), 'r') as file:
+                self.args = json.load(file)
+            print("Configuración cargada:", self.args)
+        except FileNotFoundError:
+            print("Error: El archivo conf.json no existe.")
+        except json.JSONDecodeError:
+            print("Error: conf.json no es un JSON válido.")
+    
+    def reload_config(self):
+        """Recarga conf.json y aplica nuevos valores"""
+        self.load_config()
+
+    def start_config_watcher(self):
+        """Inicia el watchdog para vigilar cambios en conf.json"""
+        event_handler = ConfigChangeHandler(self)
+        observer = Observer()
+        observer.schedule(event_handler, self.BASE_DIR, recursive=False)
+        observer_thread = threading.Thread(target=observer.start, daemon=True)
+        observer_thread.start()
+        self.config_observer = observer
+    
     def restart(self):
         self.isrunning = False
         self.start()
@@ -69,6 +108,9 @@ class BatteryChecker(SMWinservice):
     # Función que revisa cuando el archivo está por ser interrumpido (para las suspensiones y apagados)
     def stop(self):
         self.isrunning = False
+        if hasattr(self, "config_observer"):
+            self.config_observer.stop()
+            self.config_observer.join()
         if self.args['closing']:
             battery = psutil.sensors_battery()
             level = battery.percent
