@@ -24,15 +24,6 @@ import os
 
 #%% Código
 
-# Crear conexión WMI
-c = wmi.WMI()
-
-# Suscribirse a cambios en la clase Win32_Battery
-watcher = c.watch_for(
-    notification_type="Modification",
-    wmi_class="Win32_Battery"
-)
-
 class BatteryChecker(SMWinservice):
     _svc_name_ = "BatteryChecker"
     _svc_display_name_ = "Battery Notification Service"
@@ -51,6 +42,9 @@ class BatteryChecker(SMWinservice):
     def start(self):
         # Carga las variables de entorno del archivo .env
         load_dotenv(os.path.join(self.BASE_DIR, ".env"))
+
+        pythoncom.CoInitialize()
+        self._restart_wmi_watcher()
 
         # Se accede a la información del json y se guardas su infomación
         try:
@@ -90,15 +84,13 @@ class BatteryChecker(SMWinservice):
         while self.isrunning:
             try:
                 pythoncom.PumpWaitingMessages()  
-                battery = watcher(timeout_ms=1000)  # Espera evento
+                battery = self.watcher(timeout_ms=1000)  # Espera evento
 
                 if battery is None:
                     continue
                 
                 level = battery.EstimatedChargeRemaining
                 status = battery.BatteryStatus  # 1 = descargando, 2 = cargando
-
-                
 
                 if level <= self.args['lower'] and status == 1:
                     messageNotif = f"⚠️ Nivel de batería bajo ({level} %). \nConecta el cargador."
@@ -112,9 +104,14 @@ class BatteryChecker(SMWinservice):
                     self.send_telegram_message(messageNotif)
                     self.play_notification_sound("battery-high.mp3")
                     time.sleep(self.args['sleepTime'])
+            except wmi.x_wmi_timed_out:
+                # No pasó nada en ese segundo, simplemente seguimos esperando
+                continue
+
             except pythoncom.com_error as e:
                 print(f"Error COM: {e} - Reiniciando monitor WMI")
                 self._restart_wmi_watcher()
+
             except Exception as e:
                 print(f"Error inesperado: {e}")
                 time.sleep(5)
@@ -122,7 +119,11 @@ class BatteryChecker(SMWinservice):
     # Recuperación de errores WMI
     def _restart_wmi_watcher(self):
         pythoncom.CoInitialize()  # Reiniciar COM
-        self.watcher = c.watch_for(notification_type="Modification", wmi_class="Win32_Battery")
+        self.c = wmi.WMI()
+        self.watcher = self.c.watch_for(
+            notification_type="Modification",
+            wmi_class="Win32_Battery"
+        )
     
     # Función que manda mansaje a través de Telegram
     def send_telegram_message(self,message):
