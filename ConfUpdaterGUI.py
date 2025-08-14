@@ -16,6 +16,15 @@ import sys
 from PIL import Image, ImageDraw
 import pystray
 from notifypy import Notify
+import psutil
+import time
+import requests
+import wmi
+import pythoncom
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 def create_image():
     # Crea un icono básico para el tray
@@ -27,8 +36,7 @@ def create_image():
 class NotificationsApp(toga.App):
     def startup(self):
         # Obtener el directorio actual y verificar si carpeta sounds existe
-        current_directory = os.path.dirname(os.path.abspath(__file__))
-        sounds_directory = os.path.join(current_directory, 'sounds')
+        sounds_directory = os.path.join(BASE_DIR, 'sounds')
 
         if not os.path.exists(sounds_directory):
             os.makedirs(sounds_directory)
@@ -38,7 +46,7 @@ class NotificationsApp(toga.App):
         
         # Leer valores desde conf.json
         try:
-            with open("conf.json", "r") as f:
+            with open(os.path.join(BASE_DIR, 'conf.json'), 'r') as f:
                 config = json.load(f)
                 default_min_json = str(config.get("lower", 0))
                 default_max_json = str(config.get("higher", 100))
@@ -373,9 +381,8 @@ class NotificationsApp(toga.App):
 
         if file_path:
             try:
-                # Crear el path destino en la carpeta actual / sounds
-                current_directory = os.path.dirname(os.path.abspath(__file__))
-                sounds_directory = os.path.join(current_directory, 'sounds')
+                # Crear el path destino en la carpeta actual / sounds|
+                sounds_directory = os.path.join(BASE_DIR, 'sounds')
                 dest_path = os.path.join(sounds_directory, target_filename)
 
                 if os.path.exists(dest_path):
@@ -436,8 +443,7 @@ class NotificationsApp(toga.App):
             "port": int(self.port_input.value)
         }
 
-        current_directory = os.path.dirname(os.path.abspath(__file__))
-        config_path = os.path.join(current_directory, "conf.json")
+        config_path = os.path.join(BASE_DIR, "conf.json")
 
         with open(config_path, "w", encoding="utf-8") as f:
             json.dump(config_data, f, indent=4, ensure_ascii=False)
@@ -457,41 +463,180 @@ def tray_icon(app_instance):
         create_image(),
         menu=pystray.Menu(
             pystray.MenuItem('Mostrar ventana', on_clicked),
-            pystray.MenuItem('Salir', lambda icon, item: sys.exit())
+            pystray.MenuItem('Salir', salir)
         )
     )
     icon.run()
 
+def salir(icon, item):
+    icon.stop()  
+    os._exit(0)  
 
-def socket_server():
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        with open(os.path.join('conf.json'), 'r') as file:
-                args = json.load(file)
-        s.bind(('localhost', args['port']))
-        s.listen()
-        print(f"Servidor escuchando en localhost:{args['port']}")
-        while True:
-            conn, addr = s.accept()
-            with conn:
-                data = conn.recv(1024)
-                if data:
-                    try:
-                        notif = json.loads(data.decode('utf-8'))
-                        show_notification(notif['title'], notif['message'])
-                    except Exception as e:
-                        print("Error procesando notificación:", e)
+class ConfigChangeHandler(FileSystemEventHandler):
+    def __init__(self, service):
+        self.service = service
 
-def show_notification(title, message):
-    notification = Notify()
-    notification.title = title
-    notification.message = message
-    notification.send()
+    def on_modified(self, event):
+        if event.src_path.endswith("conf.json"):
+            print("⚙️ Se detectó un cambio en conf.json, recargando configuración...")
+            self.service.reload_config()
+
+class BatteryChecker():
+    args = {}
+
+    def start(self):
+        print("Preparando monitoreo . . .")
+
+        pythoncom.CoInitialize()
+        self._restart_wmi_watcher()
+        self.load_config()
+        self.start_config_watcher()
+
+        # Se accede a la información del json y se guardas su infomación
+        try:
+            with open(os.path.join(BASE_DIR, 'conf.json'), 'r') as file:
+                self.args = json.load(file)
+        except FileNotFoundError:
+            print("Error: The file was not found.")
+            sys.exit(1)
+        except json.JSONDecodeError:
+            print("Error: The file is not a valid JSON.")
+            sys.exit(1)
+
+        self.isrunning = True
+        self.main()
+    
+    def load_config(self):
+        """Carga el archivo conf.json y guarda sus valores en self.args"""
+        try:
+            with open(os.path.join(BASE_DIR, 'conf.json'), 'r') as file:
+                self.args = json.load(file)
+            print("Configuración cargada:", self.args)
+        except FileNotFoundError:
+            print("Error: El archivo conf.json no existe.")
+        except json.JSONDecodeError:
+            print("Error: conf.json no es un JSON válido.")
+    
+    def reload_config(self):
+        """Recarga conf.json y aplica nuevos valores"""
+        self.load_config()
+
+    def start_config_watcher(self):
+        """Inicia el watchdog para vigilar cambios en conf.json"""
+        event_handler = ConfigChangeHandler(self)
+        observer = Observer()
+        observer.schedule(event_handler, BASE_DIR, recursive=False)
+        observer_thread = threading.Thread(target=observer.start, daemon=True)
+        observer_thread.start()
+        self.config_observer = observer
+
+    # Función que revisa cuando el archivo está por ser interrumpido (para las suspensiones y apagados)
+    def stop(self):
+        self.isrunning = False
+        if hasattr(self, "config_observer"):
+            self.config_observer.stop()
+            self.config_observer.join()
+        if self.args['closing']:
+            battery = psutil.sensors_battery()
+            level = battery.percent
+            plugged = battery.power_plugged
+            if plugged == True:
+                messageNotif = f"ℹ️ El programa dejará de monitorear el nivel de batería ({level} %). Desenchufar"
+            else:
+                messageNotif = f"ℹ️ El programa dejará de monitorear el nivel de batería ({level} %)."
+            self.send_telegram_message(messageNotif)
+
+    # ciclo para revisar el nivel de la batería por medio de eventos
+    def main(self):
+        print("Inicio del monitoreo . . .")
+        while self.isrunning:
+            try:
+                pythoncom.PumpWaitingMessages()  
+                battery = self.watcher(timeout_ms=5000)  # Espera evento
+
+                if battery is None:
+                    continue
+                
+                level = battery.EstimatedChargeRemaining
+                status = battery.BatteryStatus  # 1 = descargando, 2 = cargando
+
+                if level <= self.args['lower'] and status == 1:
+                    messageNotif = f"⚠️ Nivel de batería bajo ({level} %). \nConecta el cargador."
+                    self.send_notification("Alerta de Batería", messageNotif)
+                    self.send_telegram_message(messageNotif)
+                    self.play_notification_sound("battery-low.mp3")
+                    time.sleep(self.args['sleepTime'])
+                elif level >= self.args['higher'] and status == 2:
+                    messageNotif = f"⚡ Batería casi llena ({level} %). \nConsidera desconectar el cargador."
+                    self.send_notification("Alerta de Batería", messageNotif)
+                    self.send_telegram_message(messageNotif)
+                    self.play_notification_sound("battery-high.mp3")
+                    time.sleep(self.args['sleepTime'])
+            except wmi.x_wmi_timed_out:
+                # No pasó nada en ese segundo, simplemente seguimos esperando
+                continue
+
+            except pythoncom.com_error as e:
+                print(f"Error COM: {e} - Reiniciando monitor WMI")
+                self._restart_wmi_watcher()
+
+            except Exception as e:
+                print(f"Error inesperado: {e}")
+                time.sleep(5)
+
+    # Recuperación de errores WMI
+    def _restart_wmi_watcher(self):
+        pythoncom.CoInitialize()  # Reiniciar COM
+        self.c = wmi.WMI()
+        self.watcher = self.c.watch_for(
+            notification_type="Modification",
+            wmi_class="Win32_Battery"
+        )
+    
+    # Función que manda mansaje a través de Telegram
+    def send_telegram_message(self,message):
+        if self.args['msgTelegram']:
+            url = "https://api.telegram.org/bot" + str(self.args['botIdTelegram']) + "/sendMessage"
+            payload = {
+                "chat_id": self.args['chatIdTelegram'],
+                "text": message
+            }
+            
+            try:
+                requests.post(url, json=payload)
+            except requests.ConnectionError as e:
+                print(f"Error de conexión: {e}")
+            except requests.Timeout as e:
+                print(f"Error de tiempo de espera: {e}")
+            except requests.RequestException as e:
+                print(f"Error general de requests: {e}")
+
+    # Función que manda la notificacion de sistema en PC
+    def send_notification(self,title, message):
+        notification = Notify()
+        notification.title = title
+        notification.message = message
+        notification.send()
+
+    # Función que reproduce el sonido para la notifiaciones de sistema en PC
+    def play_notification_sound(self,sound_file_name):
+        if self.args['sound']:
+            try:
+                playsound(os.path.join(BASE_DIR, "sounds", sound_file_name))
+            except FileNotFoundError as e:
+                print(f"Error: {e}")
+            except PermissionError:
+                print("Error: No tienes permisos para acceder al archivo.")
+            except Exception as e:
+                print(f"Ocurrió un error inesperado: {e}")
+
 
 if __name__ == "__main__":
     app = NotificationsApp("NotificationsApp", "org.example.notifications")
 
-    # Iniciar servidor en segundo plano
-    threading.Thread(target=socket_server, daemon=True).start()
+    #Inicio del monitoreo en segundo plano
+    monitor = BatteryChecker()
+    threading.Thread(target=monitor.start, daemon=True).start()
 
     # Iniciar icono de bandeja en segundo plano
     threading.Thread(target=tray_icon, args=(app,), daemon=True).start()

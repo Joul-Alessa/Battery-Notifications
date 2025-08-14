@@ -1,11 +1,10 @@
 {
-    "lower": 20,
+    "lower": 25,
     "higher": 75,
     "sound": false,
     "closing": true,
     "msgTelegram": true,
     "chatIdTelegram": "asdfg",
     "botIdTelegram": "lkjh",
-    "sleepTime": 60,
-    "port": 1111
+    "sleepTime": 60
 }
