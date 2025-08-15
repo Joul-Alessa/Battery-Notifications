@@ -10,10 +10,8 @@ from playsound import playsound
 import threading
 from toga.style import Pack
 from toga.style.pack import COLUMN, ROW
-import socket
-import io
 import sys
-from PIL import Image, ImageDraw
+from PIL import Image
 import pystray
 from notifypy import Notify
 import psutil
@@ -48,7 +46,7 @@ class NotificationsApp(toga.App):
                 default_msg_telegram_json = config.get("msgTelegram", False)
                 default_chat_id_telegram_json = config.get("chatIdTelegram", "")
                 default_bot_id_telegram_json = config.get("botIdTelegram", "")
-                default_sleep_time_json = config.get("sleepTime", "")
+                default_sleep_time_json = config.get("sleepTime", "") 
         except Exception as e:
             print("Error leyendo conf.json:", e)
             default_min_json = "0"
@@ -442,7 +440,7 @@ def tray_icon(app_instance):
 
     icon = pystray.Icon(
         "test",
-        Image.open("icon.ico"),
+        Image.open(os.path.join(BASE_DIR, "icon.ico")),
         menu=pystray.Menu(
             pystray.MenuItem('Mostrar ventana', on_clicked),
             pystray.MenuItem('Salir', salir)
@@ -596,7 +594,7 @@ class BatteryChecker():
     # Función que manda la notificacion de sistema en PC
     def send_notification(self,title, message):
         notification = Notify()
-        notification.icon = "icon.png"
+        notification.icon = os.path.join(BASE_DIR, "icon.ico")
         notification.application_name = "Battery Notifications"
         notification.title = title
         notification.message = message
@@ -616,7 +614,26 @@ class BatteryChecker():
 
 
 if __name__ == "__main__":
-    app = NotificationsApp(formal_name="Battery Notifications", app_id="org.example.notifications", icon="icon.ico")
+    
+    if not os.path.exists(os.path.join(BASE_DIR, "conf.json")):
+        print("El archivo no existe")
+        config = {
+                "lower": 25,
+                "higher": 75,
+                "sound": False,
+                "closing": True,
+                "msgTelegram": False,
+                "chatIdTelegram": "",
+                "botIdTelegram": "",
+                "sleepTime": 60
+            }
+
+        with open(os.path.join(BASE_DIR, 'conf.json'), "w", encoding="utf-8") as f:
+            json.dump(config, f, indent=4)
+            print("Archivo creado")
+
+
+    app = NotificationsApp(formal_name="Battery Notifications", app_id="org.example.notifications", icon=os.path.join(BASE_DIR, "icon.ico"))
 
     #Inicio del monitoreo en segundo plano
     monitor = BatteryChecker()
