@@ -1,6 +1,6 @@
 {
     "lower": 25,
-    "higher": 75,
+    "higher": 80,
     "sound": false,
     "closing": true,
     "msgTelegram": true,

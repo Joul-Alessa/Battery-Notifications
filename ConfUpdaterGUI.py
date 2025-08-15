@@ -26,13 +26,6 @@ from watchdog.events import FileSystemEventHandler
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-def create_image():
-    # Crea un icono básico para el tray
-    image = Image.new('RGB', (64, 64), (0, 0, 0))
-    draw = ImageDraw.Draw(image)
-    draw.rectangle((16, 16, 48, 48), fill=(255, 255, 255))
-    return image
-
 class NotificationsApp(toga.App):
     def startup(self):
         # Obtener el directorio actual y verificar si carpeta sounds existe
@@ -56,7 +49,6 @@ class NotificationsApp(toga.App):
                 default_chat_id_telegram_json = config.get("chatIdTelegram", "")
                 default_bot_id_telegram_json = config.get("botIdTelegram", "")
                 default_sleep_time_json = config.get("sleepTime", "")
-                default_port_json = config.get("port", "")
         except Exception as e:
             print("Error leyendo conf.json:", e)
             default_min_json = "0"
@@ -67,7 +59,6 @@ class NotificationsApp(toga.App):
             default_chat_id_telegram_json = ""
             default_bot_id_telegram_json = ""
             default_sleep_time_json = "60"
-            default_port_json = "1111"
         
         # Contenedor principal
         main_box = toga.Box(style=Pack(direction=COLUMN, margin=10))
@@ -282,16 +273,8 @@ class NotificationsApp(toga.App):
             style=Pack(width=100)
         )
 
-        port_label = toga.Label("Port:", style=Pack(width=90))
-        self.port_input = toga.TextInput(
-            value=default_port_json,
-            style=Pack(width=100)
-        )
-
         self.input_row_5.add(sleep_time_label)
         self.input_row_5.add(self.sleep_time_input)
-        self.input_row_5.add(port_label)
-        self.input_row_5.add(self.port_input)
 
         # Envolver la fila en otro contenedor para centrarla
         self.centered_row_5_box = toga.Box(
@@ -439,8 +422,7 @@ class NotificationsApp(toga.App):
             "msgTelegram": self.telegram_checkbox.value,
             "chatIdTelegram": self.chat_id_input.value,
             "botIdTelegram": self.telegram_bot_input.value,
-            "sleepTime": int(self.sleep_time_input.value),
-            "port": int(self.port_input.value)
+            "sleepTime": int(self.sleep_time_input.value)
         }
 
         config_path = os.path.join(BASE_DIR, "conf.json")
@@ -460,7 +442,7 @@ def tray_icon(app_instance):
 
     icon = pystray.Icon(
         "test",
-        create_image(),
+        Image.open("icon.ico"),
         menu=pystray.Menu(
             pystray.MenuItem('Mostrar ventana', on_clicked),
             pystray.MenuItem('Salir', salir)
@@ -614,6 +596,8 @@ class BatteryChecker():
     # Función que manda la notificacion de sistema en PC
     def send_notification(self,title, message):
         notification = Notify()
+        notification.icon = "icon.png"
+        notification.application_name = "Battery Notifications"
         notification.title = title
         notification.message = message
         notification.send()
@@ -632,7 +616,7 @@ class BatteryChecker():
 
 
 if __name__ == "__main__":
-    app = NotificationsApp("NotificationsApp", "org.example.notifications")
+    app = NotificationsApp(formal_name="Battery Notifications", app_id="org.example.notifications", icon="icon.ico")
 
     #Inicio del monitoreo en segundo plano
     monitor = BatteryChecker()
