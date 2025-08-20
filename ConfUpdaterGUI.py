@@ -529,29 +529,32 @@ class BatteryChecker():
     # ciclo para revisar el nivel de la batería por medio de eventos
     def main(self):
         print("Inicio del monitoreo . . .")
+        c = wmi.WMI()
         while self.isrunning:
             try:
-                pythoncom.PumpWaitingMessages()  
+                pythoncom.PumpWaitingMessages()
                 battery = self.watcher(timeout_ms=5000)  # Espera evento
 
                 if battery is None:
                     continue
                 
-                level = battery.EstimatedChargeRemaining
-                status = battery.BatteryStatus  # 1 = descargando, 2 = cargando
-
+                # refrescar con query real
+                for b in c.Win32_Battery():
+                    level = b.EstimatedChargeRemaining
+                    status = b.BatteryStatus
+                    break
+                
                 if level <= self.args['lower'] and status == 1:
                     messageNotif = f"⚠️ Nivel de batería bajo ({level} %). \nConecta el cargador."
                     self.send_notification("Alerta de Batería", messageNotif)
                     self.send_telegram_message(messageNotif)
                     self.play_notification_sound("battery-low.mp3")
-                    time.sleep(self.args['sleepTime'])
                 elif level >= self.args['higher'] and status == 2:
                     messageNotif = f"⚡ Batería casi llena ({level} %). \nConsidera desconectar el cargador."
                     self.send_notification("Alerta de Batería", messageNotif)
                     self.send_telegram_message(messageNotif)
                     self.play_notification_sound("battery-high.mp3")
-                    time.sleep(self.args['sleepTime'])
+                time.sleep(self.args['sleepTime'])
             except wmi.x_wmi_timed_out:
                 # No pasó nada en ese segundo, simplemente seguimos esperando
                 continue
