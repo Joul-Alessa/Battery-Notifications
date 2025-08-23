@@ -449,6 +449,7 @@ def tray_icon(app_instance):
     icon.run()
 
 def salir(icon, item):
+    BatteryChecker.stop(BatteryChecker())
     icon.stop()  
     os._exit(0)  
 
@@ -464,14 +465,7 @@ class ConfigChangeHandler(FileSystemEventHandler):
 class BatteryChecker():
     args = {}
 
-    def start(self):
-        print("Preparando monitoreo . . .")
-
-        pythoncom.CoInitialize()
-        self._restart_wmi_watcher()
-        self.load_config()
-        self.start_config_watcher()
-
+    def __init__(self):
         # Se accede a la información del json y se guardas su infomación
         try:
             with open(os.path.join(BASE_DIR, 'conf.json'), 'r') as file:
@@ -482,6 +476,14 @@ class BatteryChecker():
         except json.JSONDecodeError:
             print("Error: The file is not a valid JSON.")
             sys.exit(1)
+
+    def start(self):
+        print("Preparando monitoreo . . .")
+
+        pythoncom.CoInitialize()
+        self._restart_wmi_watcher()
+        self.load_config()
+        self.start_config_watcher()
 
         self.isrunning = True
         self.main()
@@ -525,6 +527,8 @@ class BatteryChecker():
             else:
                 messageNotif = f"ℹ️ El programa dejará de monitorear el nivel de batería ({level} %)."
             self.send_telegram_message(messageNotif)
+            self.send_notification("Cerrando aplicación","⚠️ Se dejará de monitorear el nivel de carga de la batería.")
+            self.play_notification_sound("disconnect.mp3")
 
     # ciclo para revisar el nivel de la batería por medio de eventos
     def main(self):
