@@ -22,7 +22,12 @@ import pythoncom
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+try:
+    BASE_DIR = sys._MEIPASS2
+except Exception:
+    BASE_DIR = os.path.abspath(".")
+
+#BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 class NotificationsApp(toga.App):
     def startup(self):
@@ -46,17 +51,17 @@ class NotificationsApp(toga.App):
                 default_msg_telegram_json = config.get("msgTelegram", False)
                 default_chat_id_telegram_json = config.get("chatIdTelegram", "")
                 default_bot_id_telegram_json = config.get("botIdTelegram", "")
-                default_sleep_time_json = config.get("sleepTime", "") 
+                default_sleep_time_json = config.get("sleepTime", 60) 
         except Exception as e:
             print("Error leyendo conf.json:", e)
-            default_min_json = "0"
-            default_max_json = "100"
+            default_min_json = 0
+            default_max_json = 100
             default_sound_enabled_json = False
             default_closing_notif_json = True
             default_msg_telegram_json = False
             default_chat_id_telegram_json = ""
             default_bot_id_telegram_json = ""
-            default_sleep_time_json = "60"
+            default_sleep_time_json = 60
         
         # Contenedor principal
         main_box = toga.Box(style=Pack(direction=COLUMN, margin=10))
@@ -279,8 +284,7 @@ class NotificationsApp(toga.App):
             style=Pack(direction=ROW, justify_content="center")
         )
         
-        if default_msg_telegram_json:
-            self.centered_row_5_box.add(self.input_row_5)
+        self.centered_row_5_box.add(self.input_row_5)
 
         # Agregar fila a la ventana principal
         main_box.add(self.centered_row_5_box)
@@ -355,7 +359,7 @@ class NotificationsApp(toga.App):
     
     async def select_and_copy_sound(self, target_filename):
         # Abrir el explorador de archivos
-        file_path = await self.main_window.open_file_dialog(
+        file_path = await self.settings_window.open_file_dialog(
             title="Selecciona un archivo de sonido",
             file_types=["mp3"]
         )

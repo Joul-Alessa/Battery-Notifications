@@ -1,3 +1,6 @@
 .env
+*.spec
 /sounds
 /__pycache__
+/build
+/dist
