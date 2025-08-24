@@ -68,7 +68,7 @@ class NotificationsApp(toga.App):
 
         # Título 1
         title_1_label = toga.Label(
-            "Battery Notifications",
+            "Notificaciones de Batería",
             style=Pack(font_size=20, margin_bottom=20, text_align="center", alignment="center")
         )
         main_box.add(title_1_label)
@@ -79,7 +79,7 @@ class NotificationsApp(toga.App):
         )
 
         # Porcentaje mínimo
-        min_percentage_label = toga.Label("Minimum (%):", style=Pack(width=90))
+        min_percentage_label = toga.Label("Mínimo (%):", style=Pack(width=90))
         self.min_percentage_input = toga.TextInput(
             value=default_min_json,
             on_change=self.validate_input,
@@ -87,7 +87,7 @@ class NotificationsApp(toga.App):
         )
 
         # Porcentaje máximo
-        max_percentage_label = toga.Label("Maximum (%):", style=Pack(width=90))
+        max_percentage_label = toga.Label("Máximo (%):", style=Pack(width=90))
         self.max_percentage_input = toga.TextInput(
             value=default_max_json,
             on_change=self.validate_input,
@@ -111,7 +111,7 @@ class NotificationsApp(toga.App):
 
         # Título 2
         title_2_label = toga.Label(
-            "Sound",
+            "Sonido",
             style=Pack(font_size=20, margin_top=10, margin_bottom=20, text_align="center", alignment="center")
         )
         main_box.add(title_2_label)
@@ -123,7 +123,7 @@ class NotificationsApp(toga.App):
 
         # Primer grupo: Enable + Switch (una fila horizontal)
         enable_group = toga.Box(style=Pack(direction=ROW, gap=10))
-        enable_sounds_label = toga.Label("Enable sounds notifications:", style=Pack(padding=(5, 0)))
+        enable_sounds_label = toga.Label("Habilitar notificaciones de sonido:", style=Pack(padding=(5, 0)))
         self.enable_sounds_checkbox = toga.Switch(
             "",
             style=Pack(),
@@ -143,8 +143,8 @@ class NotificationsApp(toga.App):
 
         # Fila: Low
         low_row = toga.Box(style=Pack(direction=ROW, gap=10))
-        low_sound_label = toga.Label("Low battery sound:", style=Pack(padding=(5, 0)))
-        self.low_sound_button = toga.Button("Select", on_press=self.on_select_low, style=Pack())
+        low_sound_label = toga.Label("Sonido de batería baja:", style=Pack(padding=(5, 0)))
+        self.low_sound_button = toga.Button("Seleccionar", on_press=self.on_select_low, style=Pack())
         low_row.add(low_sound_label)
         low_row.add(self.low_sound_button)
         if os.path.exists(low_sound_path):
@@ -155,8 +155,8 @@ class NotificationsApp(toga.App):
 
         # Fila: High
         high_row = toga.Box(style=Pack(direction=ROW, gap=10))
-        high_sound_label = toga.Label("High battery sound:", style=Pack(padding=(5, 0)))
-        self.high_sound_button = toga.Button("Select", on_press=self.on_select_high, style=Pack())
+        high_sound_label = toga.Label("Sonido de batería alta:", style=Pack(padding=(5, 0)))
+        self.high_sound_button = toga.Button("Seleccionar", on_press=self.on_select_high, style=Pack())
         high_row.add(high_sound_label)
         high_row.add(self.high_sound_button)
         if os.path.exists(high_sound_path):
@@ -167,8 +167,8 @@ class NotificationsApp(toga.App):
 
         # Fila: Disconnect
         disconnect_row = toga.Box(style=Pack(direction=ROW, gap=10))
-        disconnect_sound_label = toga.Label("Turn off the service sound:", style=Pack(padding=(5, 0)))
-        self.disconnect_sound_button = toga.Button("Select", on_press=self.on_select_disconnect, style=Pack())
+        disconnect_sound_label = toga.Label("Sonido de apagado del programa:", style=Pack(padding=(5, 0)))
+        self.disconnect_sound_button = toga.Button("Seleccionar", on_press=self.on_select_disconnect, style=Pack())
         disconnect_row.add(disconnect_sound_label)
         disconnect_row.add(self.disconnect_sound_button)
         if os.path.exists(disconnect_sound_path):
@@ -199,7 +199,7 @@ class NotificationsApp(toga.App):
 
         # Título 3
         title_3_label = toga.Label(
-            "Miscellaneous",
+            "Misceláneo",
             style=Pack(font_size=20, margin_top=10, margin_bottom=20, text_align="center", alignment="center")
         )
         main_box.add(title_3_label)
@@ -209,14 +209,14 @@ class NotificationsApp(toga.App):
             style=Pack(direction=ROW, gap=10, flex=1, alignment="center", justify_content="center")
         )
 
-        closing_notif_label = toga.Label("Enable notifications when closing:", style=Pack(padding=(5, 0)))
+        closing_notif_label = toga.Label("Habilitar notificaciones al cerrar el programa:", style=Pack(padding=(5, 0)))
         self.closing_notif_checkbox = toga.Switch(
             "",
             style=Pack(),
             value=default_closing_notif_json
         )
 
-        telegram_label = toga.Label("Enable integration with Telegram:", style=Pack(padding=(5, 0)))
+        telegram_label = toga.Label("Habilitar integración con Telegram:", style=Pack(padding=(5, 0)))
         self.telegram_checkbox = toga.Switch(
             "",
             style=Pack(),
@@ -243,13 +243,13 @@ class NotificationsApp(toga.App):
             style=Pack(direction=ROW, gap=10, flex=1, alignment="center", justify_content="center")
         )
 
-        chat_id_label = toga.Label("Chat ID:", style=Pack(width=90))
+        chat_id_label = toga.Label("ID del chat:", style=Pack(width=90))
         self.chat_id_input = toga.TextInput(
             value=default_chat_id_telegram_json,
             style=Pack(width=100)
         )
 
-        telegram_bot_label = toga.Label("Telegram Bot:", style=Pack(width=90))
+        telegram_bot_label = toga.Label("Bot de Telegram:", style=Pack(width=90))
         self.telegram_bot_input = toga.TextInput(
             value=default_bot_id_telegram_json,
             style=Pack(width=100)
@@ -276,7 +276,7 @@ class NotificationsApp(toga.App):
             style=Pack(direction=ROW, gap=10, flex=1, alignment="center", justify_content="center")
         )
 
-        sleep_time_label = toga.Label("Sleep time:", style=Pack(width=90))
+        sleep_time_label = toga.Label("Tiempo de espera:", style=Pack(width=90))
         self.sleep_time_input = toga.TextInput(
             value=default_sleep_time_json,
             style=Pack(width=100)
@@ -477,11 +477,11 @@ class NotificationsApp(toga.App):
     async def on_accept(self, widget):
         try:
             self.save_config()
-            print("Configuration saved successfully.")
+            print("Configuración guardada exitosamente.")
             self.settings_window.hide()
         except Exception as e:
-            print("Error saving configuration:", e)
-            await self.settings_window.info_dialog("Error", "Error saving configuration: " + str(e))
+            print("Error guardando la configuración:", e)
+            await self.settings_window.info_dialog("Error", "Error guardando la configuración: " + str(e))
             self.settings_window.hide()
 
     def save_config(self):
@@ -532,7 +532,7 @@ class ConfigChangeHandler(FileSystemEventHandler):
 
     def on_modified(self, event):
         if event.src_path.endswith("conf.json"):
-            print("⚙️ Se detectó un cambio en conf.json, recargando configuración...")
+            print("⚙️ Se detectó un cambio en conf.json. Recargando configuración...")
             self.service.reload_config()
 
 class BatteryChecker():
@@ -544,10 +544,10 @@ class BatteryChecker():
             with open(os.path.join(BASE_DIR, 'conf.json'), 'r') as file:
                 self.args = json.load(file)
         except FileNotFoundError:
-            print("Error: The file was not found.")
+            print("Error: No se encontró el archivo.")
             sys.exit(1)
         except json.JSONDecodeError:
-            print("Error: The file is not a valid JSON.")
+            print("Error: El archivo no es un JSON válido.")
             sys.exit(1)
 
     def start(self):
@@ -627,7 +627,7 @@ class BatteryChecker():
                     self.send_telegram_message(messageNotif)
                     self.play_notification_sound("battery-low.mp3")
                 elif level >= self.args['higher'] and status == 2:
-                    messageNotif = f"⚡ Batería casi llena ({level} %). \nConsidera desconectar el cargador."
+                    messageNotif = f"⚡ Nivel de batería alto ({level} %). \nConsidera desconectar el cargador."
                     self.send_notification("Alerta de Batería", messageNotif)
                     self.send_telegram_message(messageNotif)
                     self.play_notification_sound("battery-high.mp3")

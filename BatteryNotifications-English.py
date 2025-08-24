@@ -1,0 +1,726 @@
+'''
+Esta versión funciona bien pero al cerrar la ventana, el proceso se muere
+'''
+
+import os
+import json
+import toga
+import shutil
+from playsound import playsound
+import threading
+from toga.style import Pack
+from toga.style.pack import COLUMN, ROW
+import sys
+from PIL import Image
+import pystray
+from notifypy import Notify
+import psutil
+import time
+import requests
+import wmi
+import pythoncom
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
+
+try:
+    BASE_DIR = sys._MEIPASS2
+except Exception:
+    BASE_DIR = os.path.abspath(".")
+
+#BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+class NotificationsApp(toga.App):
+    def startup(self):
+        # Obtener el directorio actual y verificar si carpeta sounds existe
+        sounds_directory = os.path.join(BASE_DIR, 'sounds')
+
+        if not os.path.exists(sounds_directory):
+            os.makedirs(sounds_directory)
+            print("Carpeta 'sounds' creada.")
+        else:
+            print("La carpeta 'sounds' ya existe.")
+        
+        # Leer valores desde conf.json
+        try:
+            with open(os.path.join(BASE_DIR, 'conf.json'), 'r') as f:
+                config = json.load(f)
+                default_min_json = str(config.get("lower", 0))
+                default_max_json = str(config.get("higher", 100))
+                default_sound_enabled_json = config.get("sound", False)
+                default_closing_notif_json = config.get("closing", True)
+                default_msg_telegram_json = config.get("msgTelegram", False)
+                default_chat_id_telegram_json = config.get("chatIdTelegram", "")
+                default_bot_id_telegram_json = config.get("botIdTelegram", "")
+                default_sleep_time_json = config.get("sleepTime", 60) 
+        except Exception as e:
+            print("Error leyendo conf.json:", e)
+            default_min_json = 0
+            default_max_json = 100
+            default_sound_enabled_json = False
+            default_closing_notif_json = True
+            default_msg_telegram_json = False
+            default_chat_id_telegram_json = ""
+            default_bot_id_telegram_json = ""
+            default_sleep_time_json = 60
+        
+        # Contenedor principal
+        main_box = toga.Box(style=Pack(direction=COLUMN, margin=10))
+
+        # Título 1
+        title_1_label = toga.Label(
+            "Battery Notifications",
+            style=Pack(font_size=20, margin_bottom=20, text_align="center", alignment="center")
+        )
+        main_box.add(title_1_label)
+
+        # Fila horizontal con los campos de notificaciones
+        input_row_1 = toga.Box(
+            style=Pack(direction=ROW, gap=10, flex=1, alignment="center", justify_content="center")
+        )
+
+        # Porcentaje mínimo
+        min_percentage_label = toga.Label("Minimum (%):", style=Pack(width=90))
+        self.min_percentage_input = toga.TextInput(
+            value=default_min_json,
+            on_change=self.validate_input,
+            style=Pack(width=100)
+        )
+
+        # Porcentaje máximo
+        max_percentage_label = toga.Label("Maximum (%):", style=Pack(width=90))
+        self.max_percentage_input = toga.TextInput(
+            value=default_max_json,
+            on_change=self.validate_input,
+            style=Pack(width=100)
+        )
+
+        # Agregar widgets a la fila
+        input_row_1.add(min_percentage_label)
+        input_row_1.add(self.min_percentage_input)
+        input_row_1.add(max_percentage_label)
+        input_row_1.add(self.max_percentage_input)
+
+        # Envolver la fila en otro contenedor para centrarla
+        centered_row_1_box = toga.Box(
+            style=Pack(direction=ROW, justify_content="center")
+        )
+        centered_row_1_box.add(input_row_1)
+
+        # Agregar fila a la ventana principal
+        main_box.add(centered_row_1_box)
+
+        # Título 2
+        title_2_label = toga.Label(
+            "Sound",
+            style=Pack(font_size=20, margin_top=10, margin_bottom=20, text_align="center", alignment="center")
+        )
+        main_box.add(title_2_label)
+
+        # Fila con Enable, low/high y botones select
+        self.input_row_2 = toga.Box(
+            style=Pack(direction=ROW, gap=10, flex=1, alignment="center", justify_content="center")
+        )
+
+        # Primer grupo: Enable + Switch (una fila horizontal)
+        enable_group = toga.Box(style=Pack(direction=ROW, gap=10))
+        enable_sounds_label = toga.Label("Enable sounds notifications:", style=Pack(padding=(5, 0)))
+        self.enable_sounds_checkbox = toga.Switch(
+            "",
+            style=Pack(),
+            on_change=self.toggle_sounds_fields,
+            value=default_sound_enabled_json
+        )
+        enable_group.add(enable_sounds_label)
+        enable_group.add(self.enable_sounds_checkbox)
+
+        # Segundo grupo: bloque vertical con filas individuales para cada sonido
+        self.sound_column = toga.Box(style=Pack(direction=COLUMN, gap=5))
+
+        # Verifica y añade botones para reproducir sonidos existentes
+        low_sound_path = os.path.join(sounds_directory, "battery-low.mp3")
+        high_sound_path = os.path.join(sounds_directory, "battery-high.mp3")
+        disconnect_sound_path = os.path.join(sounds_directory, "disconnect.mp3")
+
+        # Fila: Low
+        low_row = toga.Box(style=Pack(direction=ROW, gap=10))
+        low_sound_label = toga.Label("Low battery sound:", style=Pack(padding=(5, 0)))
+        self.low_sound_button = toga.Button("Select", on_press=self.on_select_low, style=Pack())
+        low_row.add(low_sound_label)
+        low_row.add(self.low_sound_button)
+        if os.path.exists(low_sound_path):
+            play_low_button = toga.Button("▶", on_press=lambda w: self.play_sound(low_sound_path), style=Pack(width=40))
+            low_row.add(play_low_button)
+        self.play_low_button = None if not os.path.exists(low_sound_path) else play_low_button
+        self.low_row = low_row
+
+        # Fila: High
+        high_row = toga.Box(style=Pack(direction=ROW, gap=10))
+        high_sound_label = toga.Label("High battery sound:", style=Pack(padding=(5, 0)))
+        self.high_sound_button = toga.Button("Select", on_press=self.on_select_high, style=Pack())
+        high_row.add(high_sound_label)
+        high_row.add(self.high_sound_button)
+        if os.path.exists(high_sound_path):
+            play_high_button = toga.Button("▶", on_press=lambda w: self.play_sound(high_sound_path), style=Pack(width=40))
+            high_row.add(play_high_button)
+        self.play_high_button = None if not os.path.exists(high_sound_path) else play_high_button
+        self.high_row = high_row
+
+        # Fila: Disconnect
+        disconnect_row = toga.Box(style=Pack(direction=ROW, gap=10))
+        disconnect_sound_label = toga.Label("Turn off the program sound:", style=Pack(padding=(5, 0)))
+        self.disconnect_sound_button = toga.Button("Select", on_press=self.on_select_disconnect, style=Pack())
+        disconnect_row.add(disconnect_sound_label)
+        disconnect_row.add(self.disconnect_sound_button)
+        if os.path.exists(disconnect_sound_path):
+            play_disconnect_button = toga.Button("▶", on_press=lambda w: self.play_sound(disconnect_sound_path), style=Pack(width=40))
+            disconnect_row.add(play_disconnect_button)
+        self.play_disconnect_button = None if not os.path.exists(disconnect_sound_path) else play_disconnect_button
+        self.disconnect_row = disconnect_row
+
+        # Agregar las filas al bloque vertical
+        self.sound_column.add(low_row)
+        self.sound_column.add(high_row)
+        self.sound_column.add(disconnect_row)
+
+        # Agregar los grupos a la fila principal
+        self.input_row_2.add(enable_group)
+
+        if default_sound_enabled_json:
+            self.input_row_2.add(self.sound_column)
+
+        # Envolver la fila en otro contenedor para centrarla
+        centered_row_2_box = toga.Box(
+            style=Pack(direction=ROW, justify_content="center")
+        )
+        centered_row_2_box.add(self.input_row_2)
+
+        # Agregar fila a la ventana principal
+        main_box.add(centered_row_2_box)
+
+        # Título 3
+        title_3_label = toga.Label(
+            "Miscellaneous",
+            style=Pack(font_size=20, margin_top=10, margin_bottom=20, text_align="center", alignment="center")
+        )
+        main_box.add(title_3_label)
+
+        # Fila con para eventos misceláneos obligatorios
+        input_row_3 = toga.Box(
+            style=Pack(direction=ROW, gap=10, flex=1, alignment="center", justify_content="center")
+        )
+
+        closing_notif_label = toga.Label("Enable notifications when closing the program:", style=Pack(padding=(5, 0)))
+        self.closing_notif_checkbox = toga.Switch(
+            "",
+            style=Pack(),
+            value=default_closing_notif_json
+        )
+
+        telegram_label = toga.Label("Enable integration with Telegram:", style=Pack(padding=(5, 0)))
+        self.telegram_checkbox = toga.Switch(
+            "",
+            style=Pack(),
+            on_change=self.toggle_telegram_fields,
+            value=default_msg_telegram_json
+        )
+
+        input_row_3.add(closing_notif_label)
+        input_row_3.add(self.closing_notif_checkbox)
+        input_row_3.add(telegram_label)
+        input_row_3.add(self.telegram_checkbox)
+
+        # Envolver la fila en otro contenedor para centrarla
+        centered_row_3_box = toga.Box(
+            style=Pack(direction=ROW, justify_content="center")
+        )
+        centered_row_3_box.add(input_row_3)
+
+        # Agregar fila a la ventana principal
+        main_box.add(centered_row_3_box)
+
+        # Fila para eventos misceláneos opcionales
+        self.input_row_4 = toga.Box(
+            style=Pack(direction=ROW, gap=10, flex=1, alignment="center", justify_content="center")
+        )
+
+        chat_id_label = toga.Label("Chat ID:", style=Pack(width=90))
+        self.chat_id_input = toga.TextInput(
+            value=default_chat_id_telegram_json,
+            style=Pack(width=100)
+        )
+
+        telegram_bot_label = toga.Label("Telegram Bot:", style=Pack(width=90))
+        self.telegram_bot_input = toga.TextInput(
+            value=default_bot_id_telegram_json,
+            style=Pack(width=100)
+        )
+
+        self.input_row_4.add(chat_id_label)
+        self.input_row_4.add(self.chat_id_input)
+        self.input_row_4.add(telegram_bot_label)
+        self.input_row_4.add(self.telegram_bot_input)
+
+        # Envolver la fila en otro contenedor para centrarla
+        self.centered_row_4_box = toga.Box(
+            style=Pack(direction=ROW, justify_content="center")
+        )
+        
+        if default_msg_telegram_json:
+            self.centered_row_4_box.add(self.input_row_4)
+
+        # Agregar fila a la ventana principal
+        main_box.add(self.centered_row_4_box)
+
+        # Fila para la configuración de sleep y puertos
+        self.input_row_5 = toga.Box(
+            style=Pack(direction=ROW, gap=10, flex=1, alignment="center", justify_content="center")
+        )
+
+        sleep_time_label = toga.Label("Sleep time:", style=Pack(width=90))
+        self.sleep_time_input = toga.TextInput(
+            value=default_sleep_time_json,
+            style=Pack(width=100)
+        )
+
+        self.input_row_5.add(sleep_time_label)
+        self.input_row_5.add(self.sleep_time_input)
+
+        # Envolver la fila en otro contenedor para centrarla
+        self.centered_row_5_box = toga.Box(
+            style=Pack(direction=ROW, justify_content="center")
+        )
+        
+        self.centered_row_5_box.add(self.input_row_5)
+
+        # Agregar fila a la ventana principal
+        main_box.add(self.centered_row_5_box)
+
+        # Fila de botones para guardar el contenido
+        input_row_6 = toga.Box(
+            style=Pack(direction=ROW, gap=10, flex=1, alignment="center", justify_content="center")
+        )
+
+        self.accept_button = toga.Button("Aceptar", on_press=self.on_accept, style=Pack(width=100))
+        self.cancel_button = toga.Button("Cancelar", on_press=self.on_cancel, style=Pack(width=100))
+
+        input_row_6.add(self.accept_button)
+        input_row_6.add(self.cancel_button)
+
+        # Envolver la fila en otro contenedor para centrarla
+        centered_row_6_box = toga.Box(
+            style=Pack(direction=ROW, justify_content="center", margin_top=10)
+        )
+        centered_row_6_box.add(input_row_6)
+
+        # Agregar fila a la ventana principal
+        main_box.add(centered_row_6_box)
+
+
+        # Mostrar ventana
+        self.main_window = toga.App.BACKGROUND
+        self.settings_window = toga.Window(title=self.formal_name, size=(700, 500))
+        self.settings_window.content = main_box
+
+        self.settings_window.on_close = self._on_settings_close
+        self.windows.add(self.settings_window)
+    
+    def _on_settings_close(self, window, **kwargs):
+        # ocultar en vez de cerrar; devolver False para impedir que Toga destruya la ventana.
+        window.hide()
+        return False
+    
+    def load_config_into_gui(self):
+        try:
+            with open(os.path.join(BASE_DIR, 'conf.json'), 'r') as f:
+                config = json.load(f)
+
+            # Actualizar campos
+            self.min_percentage_input.value = str(config.get("lower", 0))
+            self.max_percentage_input.value = str(config.get("higher", 100))
+            self.enable_sounds_checkbox.value = config.get("sound", False)
+            self.closing_notif_checkbox.value = config.get("closing", True)
+            self.telegram_checkbox.value = config.get("msgTelegram", False)
+            self.chat_id_input.value = config.get("chatIdTelegram", "")
+            self.telegram_bot_input.value = config.get("botIdTelegram", "")
+            self.sleep_time_input.value = str(config.get("sleepTime", 60))
+
+            # Mostrar u ocultar secciones dependiendo de switches
+            if self.enable_sounds_checkbox.value and self.sound_column not in self.input_row_2.children:
+                self.input_row_2.add(self.sound_column)
+            elif not self.enable_sounds_checkbox.value and self.sound_column in self.input_row_2.children:
+                self.input_row_2.remove(self.sound_column)
+
+            if self.telegram_checkbox.value and self.input_row_4 not in self.centered_row_4_box.children:
+                self.centered_row_4_box.add(self.input_row_4)
+            elif not self.telegram_checkbox.value and self.input_row_4 in self.centered_row_4_box.children:
+                self.centered_row_4_box.remove(self.input_row_4)
+
+        except Exception as e:
+            print("⚠️ Error loading conf.json in GUI:", e)
+    
+    def show_settings_window(self):
+        self.load_config_into_gui()
+        self.sync_sound_buttons()
+        self.settings_window.show()
+        try:
+            self.settings_window.focus()
+        except Exception:
+            pass
+    
+    def show_window(self):
+        self.main_window.show()
+
+    def hide_window(self, *args, **kwargs):
+        self.main_window.hide()
+        return True  # True = evitar que se cierre el app
+    
+    # Función para validar los inputs de las entradas y que solo se escriban números enteros entre 0 y 100
+    def validate_input(self, widget):
+        value = widget.value
+        if not value.isdigit():
+            widget.value = ''.join(filter(str.isdigit, value))
+        elif int(value) > 100:
+            widget.value = "100"
+    
+    async def on_select_low(self, widget):
+        await self.select_and_copy_sound("battery-low.mp3")
+
+    async def on_select_high(self, widget):
+        await self.select_and_copy_sound("battery-high.mp3")
+    
+    async def on_select_disconnect(self, widget):
+        await self.select_and_copy_sound("disconnect.mp3")
+    
+    async def select_and_copy_sound(self, target_filename):
+        file_path = await self.settings_window.open_file_dialog(
+            title="Select a sound file",
+            file_types=["mp3"]
+        )
+
+        if file_path:
+            try:
+                sounds_directory = os.path.join(BASE_DIR, 'sounds')
+                dest_path = os.path.join(sounds_directory, target_filename)
+
+                if os.path.exists(dest_path):
+                    try:
+                        os.remove(dest_path)
+                    except Exception as e:
+                        print("Couldn't delete existing file: " + str(e))
+                        return
+
+                shutil.copyfile(file_path, dest_path)
+                print("File copied as: " + str(dest_path))
+                self.sync_sound_buttons()
+            except Exception as e:
+                print("Error copying file: " + str(e))
+    
+    def sync_sound_buttons(self):
+        sounds_directory = os.path.join(BASE_DIR, 'sounds')
+
+        # Low
+        low_path = os.path.join(sounds_directory, "battery-low.mp3")
+        if os.path.exists(low_path):
+            if self.play_low_button is None:
+                self.play_low_button = toga.Button("▶", on_press=lambda w: self.play_sound(low_path), style=Pack(width=40))
+                self.low_row.add(self.play_low_button)
+        else:
+            if self.play_low_button is not None:
+                self.low_row.remove(self.play_low_button)
+                self.play_low_button = None
+
+        # High
+        high_path = os.path.join(sounds_directory, "battery-high.mp3")
+        if os.path.exists(high_path):
+            if self.play_high_button is None:
+                self.play_high_button = toga.Button("▶", on_press=lambda w: self.play_sound(high_path), style=Pack(width=40))
+                self.high_row.add(self.play_high_button)
+        else:
+            if self.play_high_button is not None:
+                self.high_row.remove(self.play_high_button)
+                self.play_high_button = None
+
+        # Disconnect
+        disconnect_path = os.path.join(sounds_directory, "disconnect.mp3")
+        if os.path.exists(disconnect_path):
+            if self.play_disconnect_button is None:
+                self.play_disconnect_button = toga.Button("▶", on_press=lambda w: self.play_sound(disconnect_path), style=Pack(width=40))
+                self.disconnect_row.add(self.play_disconnect_button)
+        else:
+            if self.play_disconnect_button is not None:
+                self.disconnect_row.remove(self.play_disconnect_button)
+                self.play_disconnect_button = None
+
+    
+    def toggle_sounds_fields(self, widget):
+        if widget.value:
+            self.input_row_2.add(self.sound_column)
+        else:
+            self.input_row_2.remove(self.sound_column)
+    
+    def toggle_telegram_fields(self, widget):
+        if widget.value:
+            self.centered_row_4_box.add(self.input_row_4)
+        else:
+            self.centered_row_4_box.remove(self.input_row_4)
+    
+    def play_sound(self, filename):
+        def _play():
+            try:
+                playsound(filename)
+            except Exception as e:
+                print("Error playing sound: " + str(e))
+
+        # Ejecutar en hilo para no bloquear la interfaz
+        threading.Thread(target=_play, daemon=True).start()
+    
+    async def on_accept(self, widget):
+        try:
+            self.save_config()
+            print("Configuration saved successfully.")
+            self.settings_window.hide()
+        except Exception as e:
+            print("Error saving configuration:", e)
+            await self.settings_window.info_dialog("Error", "Error saving configuration: " + str(e))
+            self.settings_window.hide()
+
+    def save_config(self):
+        config_data = {
+            "lower": int(self.min_percentage_input.value) if self.min_percentage_input.value.isdigit() else 0,
+            "higher": int(self.max_percentage_input.value) if self.max_percentage_input.value.isdigit() else 100,
+            "sound": self.enable_sounds_checkbox.value,
+            "closing": self.closing_notif_checkbox.value,
+            "msgTelegram": self.telegram_checkbox.value,
+            "chatIdTelegram": self.chat_id_input.value,
+            "botIdTelegram": self.telegram_bot_input.value,
+            "sleepTime": int(self.sleep_time_input.value)
+        }
+
+        config_path = os.path.join(BASE_DIR, "conf.json")
+
+        with open(config_path, "w", encoding="utf-8") as f:
+            json.dump(config_data, f, indent=4, ensure_ascii=False)
+
+    def on_cancel(self, widget):
+        self.settings_window.hide()
+
+def tray_icon(app_instance):
+    def on_clicked(icon, item):
+        try:
+            app_instance.loop.call_soon_threadsafe(app_instance.show_settings_window)
+        except Exception as e:
+            print("Error trying to show window:", e)
+
+    icon = pystray.Icon(
+        "test",
+        Image.open(os.path.join(BASE_DIR, "icon.ico")),
+        menu=pystray.Menu(
+            pystray.MenuItem('Show window', on_clicked),
+            pystray.MenuItem('Exit', salir)
+        )
+    )
+    icon.run()
+
+def salir(icon, item):
+    BatteryChecker.stop(BatteryChecker())
+    icon.stop()  
+    os._exit(0)  
+
+class ConfigChangeHandler(FileSystemEventHandler):
+    def __init__(self, service):
+        self.service = service
+
+    def on_modified(self, event):
+        if event.src_path.endswith("conf.json"):
+            print("⚙️ Change at conf.json detected. Reloading configuration...")
+            self.service.reload_config()
+
+class BatteryChecker():
+    args = {}
+
+    def __init__(self):
+        # Se accede a la información del json y se guardas su infomación
+        try:
+            with open(os.path.join(BASE_DIR, 'conf.json'), 'r') as file:
+                self.args = json.load(file)
+        except FileNotFoundError:
+            print("Error: The file was not found.")
+            sys.exit(1)
+        except json.JSONDecodeError:
+            print("Error: The file is not a valid JSON.")
+            sys.exit(1)
+
+    def start(self):
+        print("Preparing monitoring . . .")
+
+        pythoncom.CoInitialize()
+        self._restart_wmi_watcher()
+        self.load_config()
+        self.start_config_watcher()
+
+        self.isrunning = True
+        self.main()
+    
+    def load_config(self):
+        """Carga el archivo conf.json y guarda sus valores en self.args"""
+        try:
+            with open(os.path.join(BASE_DIR, 'conf.json'), 'r') as file:
+                self.args = json.load(file)
+            print("Configuration loaded:", self.args)
+        except FileNotFoundError:
+            print("Error: File conf.json does not exist.")
+        except json.JSONDecodeError:
+            print("Error: conf.json is not a valid JSON.")
+    
+    def reload_config(self):
+        """Recarga conf.json y aplica nuevos valores"""
+        self.load_config()
+
+    def start_config_watcher(self):
+        """Inicia el watchdog para vigilar cambios en conf.json"""
+        event_handler = ConfigChangeHandler(self)
+        observer = Observer()
+        observer.schedule(event_handler, BASE_DIR, recursive=False)
+        observer_thread = threading.Thread(target=observer.start, daemon=True)
+        observer_thread.start()
+        self.config_observer = observer
+
+    # Función que revisa cuando el archivo está por ser interrumpido (para las suspensiones y apagados)
+    def stop(self):
+        self.isrunning = False
+        if hasattr(self, "config_observer"):
+            self.config_observer.stop()
+            self.config_observer.join()
+        if self.args['closing']:
+            battery = psutil.sensors_battery()
+            level = battery.percent
+            plugged = battery.power_plugged
+            if plugged == True:
+                messageNotif = f"ℹ️ The program will stop monitoring the battery level ({level} %). Unplug"
+            else:
+                messageNotif = f"ℹ️ The program will stop monitoring the battery level ({level} %)."
+            self.send_telegram_message(messageNotif)
+            self.send_notification("Closing application","⚠️ The program will stop monitoring the battery level.")
+            self.play_notification_sound("disconnect.mp3")
+
+    # ciclo para revisar el nivel de la batería por medio de eventos
+    def main(self):
+        print("Starting monitoring . . .")
+        c = wmi.WMI()
+        while self.isrunning:
+            try:
+                pythoncom.PumpWaitingMessages()
+                battery = self.watcher(timeout_ms=5000)  # Espera evento
+
+                if battery is None:
+                    continue
+                
+                # refrescar con query real
+                for b in c.Win32_Battery():
+                    level = b.EstimatedChargeRemaining
+                    status = b.BatteryStatus
+                    break
+                
+                if level <= self.args['lower'] and status == 1:
+                    messageNotif = f"⚠️ Battery level low ({level} %). \nPlug the laptop."
+                    self.send_notification("Battery Alert", messageNotif)
+                    self.send_telegram_message(messageNotif)
+                    self.play_notification_sound("battery-low.mp3")
+                elif level >= self.args['higher'] and status == 2:
+                    messageNotif = f"⚡ Battery level high ({level} %). \nConsider unplug the laptop."
+                    self.send_notification("Battery Alert", messageNotif)
+                    self.send_telegram_message(messageNotif)
+                    self.play_notification_sound("battery-high.mp3")
+                time.sleep(self.args['sleepTime'])
+            except wmi.x_wmi_timed_out:
+                # No pasó nada en ese segundo, simplemente seguimos esperando
+                continue
+
+            except pythoncom.com_error as e:
+                print(f"Error COM: {e} - Rebooting monitor WMI")
+                self._restart_wmi_watcher()
+
+            except Exception as e:
+                print(f"Unexpected error: {e}")
+                time.sleep(5)
+
+    # Recuperación de errores WMI
+    def _restart_wmi_watcher(self):
+        pythoncom.CoInitialize()  # Reiniciar COM
+        self.c = wmi.WMI()
+        self.watcher = self.c.watch_for(
+            notification_type="Modification",
+            wmi_class="Win32_Battery"
+        )
+    
+    # Función que manda mansaje a través de Telegram
+    def send_telegram_message(self,message):
+        if self.args['msgTelegram']:
+            url = "https://api.telegram.org/bot" + str(self.args['botIdTelegram']) + "/sendMessage"
+            payload = {
+                "chat_id": self.args['chatIdTelegram'],
+                "text": message
+            }
+            
+            try:
+                requests.post(url, json=payload)
+            except requests.ConnectionError as e:
+                print(f"Connection error: {e}")
+            except requests.Timeout as e:
+                print(f"Timeout exceeded error: {e}")
+            except requests.RequestException as e:
+                print(f"General requests error: {e}")
+
+    # Función que manda la notificacion de sistema en PC
+    def send_notification(self,title, message):
+        notification = Notify()
+        notification.icon = os.path.join(BASE_DIR, "icon.ico")
+        notification.application_name = "Battery Notifications"
+        notification.title = title
+        notification.message = message
+        notification.send()
+
+    # Función que reproduce el sonido para la notifiaciones de sistema en PC
+    def play_notification_sound(self,sound_file_name):
+        if self.args['sound']:
+            try:
+                playsound(os.path.join(BASE_DIR, "sounds", sound_file_name))
+            except FileNotFoundError as e:
+                print(f"Error: {e}")
+            except PermissionError:
+                print("Error: You don't have permissions to access the file.")
+            except Exception as e:
+                print(f"Unexpected error occurred: {e}")
+
+
+if __name__ == "__main__":
+    
+    if not os.path.exists(os.path.join(BASE_DIR, "conf.json")):
+        print("El archivo no existe")
+        config = {
+                "lower": 25,
+                "higher": 75,
+                "sound": False,
+                "closing": True,
+                "msgTelegram": False,
+                "chatIdTelegram": "",
+                "botIdTelegram": "",
+                "sleepTime": 60
+            }
+
+        with open(os.path.join(BASE_DIR, 'conf.json'), "w", encoding="utf-8") as f:
+            json.dump(config, f, indent=4)
+            print("File created")
+
+
+    app = NotificationsApp(formal_name="Battery Notifications", app_id="org.example.notifications", icon=os.path.join(BASE_DIR, "icon.ico"))
+
+    #Inicio del monitoreo en segundo plano
+    monitor = BatteryChecker()
+    threading.Thread(target=monitor.start, daemon=True).start()
+
+    # Iniciar icono de bandeja en segundo plano
+    threading.Thread(target=tray_icon, args=(app,), daemon=True).start()
+
+    # Iniciar la app de Toga
+    app.main_loop()
