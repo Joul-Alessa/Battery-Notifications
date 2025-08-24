@@ -150,6 +150,8 @@ class NotificationsApp(toga.App):
         if os.path.exists(low_sound_path):
             play_low_button = toga.Button("▶", on_press=lambda w: self.play_sound(low_sound_path), style=Pack(width=40))
             low_row.add(play_low_button)
+        self.play_low_button = None if not os.path.exists(low_sound_path) else play_low_button
+        self.low_row = low_row
 
         # Fila: High
         high_row = toga.Box(style=Pack(direction=ROW, gap=10))
@@ -160,6 +162,8 @@ class NotificationsApp(toga.App):
         if os.path.exists(high_sound_path):
             play_high_button = toga.Button("▶", on_press=lambda w: self.play_sound(high_sound_path), style=Pack(width=40))
             high_row.add(play_high_button)
+        self.play_high_button = None if not os.path.exists(high_sound_path) else play_high_button
+        self.high_row = high_row
 
         # Fila: Disconnect
         disconnect_row = toga.Box(style=Pack(direction=ROW, gap=10))
@@ -170,6 +174,8 @@ class NotificationsApp(toga.App):
         if os.path.exists(disconnect_sound_path):
             play_disconnect_button = toga.Button("▶", on_press=lambda w: self.play_sound(disconnect_sound_path), style=Pack(width=40))
             disconnect_row.add(play_disconnect_button)
+        self.play_disconnect_button = None if not os.path.exists(disconnect_sound_path) else play_disconnect_button
+        self.disconnect_row = disconnect_row
 
         # Agregar las filas al bloque vertical
         self.sound_column.add(low_row)
@@ -323,11 +329,39 @@ class NotificationsApp(toga.App):
         window.hide()
         return False
     
+    def load_config_into_gui(self):
+        try:
+            with open(os.path.join(BASE_DIR, 'conf.json'), 'r') as f:
+                config = json.load(f)
+
+            # Actualizar campos
+            self.min_percentage_input.value = str(config.get("lower", 0))
+            self.max_percentage_input.value = str(config.get("higher", 100))
+            self.enable_sounds_checkbox.value = config.get("sound", False)
+            self.closing_notif_checkbox.value = config.get("closing", True)
+            self.telegram_checkbox.value = config.get("msgTelegram", False)
+            self.chat_id_input.value = config.get("chatIdTelegram", "")
+            self.telegram_bot_input.value = config.get("botIdTelegram", "")
+            self.sleep_time_input.value = str(config.get("sleepTime", 60))
+
+            # Mostrar u ocultar secciones dependiendo de switches
+            if self.enable_sounds_checkbox.value and self.sound_column not in self.input_row_2.children:
+                self.input_row_2.add(self.sound_column)
+            elif not self.enable_sounds_checkbox.value and self.sound_column in self.input_row_2.children:
+                self.input_row_2.remove(self.sound_column)
+
+            if self.telegram_checkbox.value and self.input_row_4 not in self.centered_row_4_box.children:
+                self.centered_row_4_box.add(self.input_row_4)
+            elif not self.telegram_checkbox.value and self.input_row_4 in self.centered_row_4_box.children:
+                self.centered_row_4_box.remove(self.input_row_4)
+
+        except Exception as e:
+            print("⚠️ Error cargando conf.json en GUI:", e)
+    
     def show_settings_window(self):
-        # método que ejecutaremos desde el thread del tray mediante app.loop.call_soon_threadsafe
-        # si la ventana ya está cerrada/recreada, podrías comprobar y volver a crearla
+        self.load_config_into_gui()
+        self.sync_sound_buttons()
         self.settings_window.show()
-        # opcional: intentar dar foco
         try:
             self.settings_window.focus()
         except Exception:
@@ -358,7 +392,6 @@ class NotificationsApp(toga.App):
         await self.select_and_copy_sound("disconnect.mp3")
     
     async def select_and_copy_sound(self, target_filename):
-        # Abrir el explorador de archivos
         file_path = await self.settings_window.open_file_dialog(
             title="Selecciona un archivo de sonido",
             file_types=["mp3"]
@@ -366,7 +399,6 @@ class NotificationsApp(toga.App):
 
         if file_path:
             try:
-                # Crear el path destino en la carpeta actual / sounds|
                 sounds_directory = os.path.join(BASE_DIR, 'sounds')
                 dest_path = os.path.join(sounds_directory, target_filename)
 
@@ -377,11 +409,48 @@ class NotificationsApp(toga.App):
                         print("No se pudo eliminar el archivo existente: " + str(e))
                         return
 
-                # Copiar y sobreescribir si ya existe
                 shutil.copyfile(file_path, dest_path)
                 print("Archivo copiado como: " + str(dest_path))
+                self.sync_sound_buttons()
             except Exception as e:
                 print("Error al copiar el archivo: " + str(e))
+    
+    def sync_sound_buttons(self):
+        sounds_directory = os.path.join(BASE_DIR, 'sounds')
+
+        # Low
+        low_path = os.path.join(sounds_directory, "battery-low.mp3")
+        if os.path.exists(low_path):
+            if self.play_low_button is None:
+                self.play_low_button = toga.Button("▶", on_press=lambda w: self.play_sound(low_path), style=Pack(width=40))
+                self.low_row.add(self.play_low_button)
+        else:
+            if self.play_low_button is not None:
+                self.low_row.remove(self.play_low_button)
+                self.play_low_button = None
+
+        # High
+        high_path = os.path.join(sounds_directory, "battery-high.mp3")
+        if os.path.exists(high_path):
+            if self.play_high_button is None:
+                self.play_high_button = toga.Button("▶", on_press=lambda w: self.play_sound(high_path), style=Pack(width=40))
+                self.high_row.add(self.play_high_button)
+        else:
+            if self.play_high_button is not None:
+                self.high_row.remove(self.play_high_button)
+                self.play_high_button = None
+
+        # Disconnect
+        disconnect_path = os.path.join(sounds_directory, "disconnect.mp3")
+        if os.path.exists(disconnect_path):
+            if self.play_disconnect_button is None:
+                self.play_disconnect_button = toga.Button("▶", on_press=lambda w: self.play_sound(disconnect_path), style=Pack(width=40))
+                self.disconnect_row.add(self.play_disconnect_button)
+        else:
+            if self.play_disconnect_button is not None:
+                self.disconnect_row.remove(self.play_disconnect_button)
+                self.play_disconnect_button = None
+
     
     def toggle_sounds_fields(self, widget):
         if widget.value:
