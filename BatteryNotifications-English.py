@@ -300,8 +300,8 @@ class NotificationsApp(toga.App):
             style=Pack(direction=ROW, gap=10, flex=1, alignment="center", justify_content="center")
         )
 
-        self.accept_button = toga.Button("Aceptar", on_press=self.on_accept, style=Pack(width=100))
-        self.cancel_button = toga.Button("Cancelar", on_press=self.on_cancel, style=Pack(width=100))
+        self.accept_button = toga.Button("Accept", on_press=self.on_accept, style=Pack(width=100))
+        self.cancel_button = toga.Button("Cancel", on_press=self.on_cancel, style=Pack(width=100))
 
         input_row_6.add(self.accept_button)
         input_row_6.add(self.cancel_button)
