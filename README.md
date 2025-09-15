@@ -32,27 +32,21 @@ This is why I decided to automate this process with a Python script and be alert
 
 The goal of this development was to detect if the computer's battery reached a minimum limit to plug it in, or a maximum limit to unplug it, and notify the user through a desktop and audible notification on the computer, as well as a notification to the user's phone implemented through a service. Some alternatives considered and discarded included WhatsApp, Discord, e-mail, or SMS.
 
+<h2 align="center">Usage</h2>
+
+1. First, download the installer of your choice from the Releases section of this repository.
+2. Run the installer with the desired configurations available in the installer.
+3. Once execution starts, an icon will appear in the notification tray.
+4. By right-clicking on it, you can either terminate the execution or open the project’s configuration window.
+5. You can configure maximum and minimum values, sounds, Telegram integration, and the sleep interval between alerts.
+6. For Telegram integration, it is necessary to obtain the Chat ID (without including the "#" sign) to which messages will be sent, as well as the Telegram bot token that will be used to send the messages (to create your own bot, it is recommended to use the BotFather assistant).
+7. A shortcut can be created in the startup folder (accessible by typing ```shell:startup``` in the Run window, which opens with the ```Win + R``` shortcut) for automatic startup when the system boots.
+
+For a visual demonstration of installation, usage, Telegram configuration, startup setup, and troubleshooting errors caused by system confusion, please refer to the following attached video showing these steps.
+
 <iframe width="914" height="514" src="https://www.youtube.com/embed/2v45GJmRpF8" title="Battery Notifications: Tutorial and demonstration of use" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 
-
-
-
-
-# Battery-Notifications
-
-Automating a laptop task that gets notifications when the battery reaches a determined level
-
-## Introduction
-
-By making improper use of my laptop's battery charge, I have caused significant deterioration to the point that the battery is now in a severely damaged state.
-
-Even though this component can be replaced with a new one, I found that my laptop, **which runs on Windows 11**, has a way of notifying the user when the battery is running low. However, it does not have a way to notify the user when the battery is about to reach 100%, which is the case that has caused the deterioration of my battery.
-
-This is why I decided to automate this process with a Python script and be alerted to plug or unplug the device when the battery approaches very low or very high levels, respectively and to develop the solution together with my brother [PPolux21](https://github.com/PPolux21), working side by side to automate this task.
-
-The goal of this development was to detect if the computer's battery reached a minimum limit to plug it in, or a maximum limit to unplug it, and notify the user through a desktop and audible notification on the computer, as well as a notification to the user's phone implemented through a service. Some alternatives considered and discarded included WhatsApp, Discord, e-mail, or SMS.
-
-## The Process, Setup and Usage
+<h2 align="center">Technical notes about the development</h2>
 
 - Python was used to carry out the automation task.
 - The ```psutil``` library was used to check the battery level and whether it was charging or not.
@@ -64,35 +58,10 @@ The goal of this development was to detect if the computer's battery reached a m
 - The ```argparse``` library was used to support console arguments and make the automation of this task more customizable.
 - Telegram and its API, as well as its bot development extension, were used in the objective section to send this notification to the user's phone.
 
-For personal use, it is required to create a .env file in the root of this repository with the following structure:
-
-```
-TOKEN=""
-CHAT_ID=""
-```
-
-Where:
-
-- ```TOKEN``` is the token of the created Telegram bot
-- ```CHAT_ID``` is the personal chat ID to which the notification will be sent.
-
-In a folder called ```sounds```, there are the sound files that will be played as part of the corresponding notification, and the selection of the authors of these sounds is not included in this repository.
-
-After this setup, the program can be used through the console with a command like the following:
+We compiled the Python file as an executable file using PyInstaller with the following command:
 
 ```bash
-python BatteryChecker.py
+py -3.13 -m PyInstaller BatteryNotifications-English.py
 ```
 
-If nothing is specified, some parameters for configuring the task will take their default values. These customizable parameters are:
-
-- ```--lower```: Specifies the minimum acceptable battery level, in a range from 0 to 100. If the battery level drops below this value, notifications will start being sent every 90 seconds (default value is 20).
-- ```--higher```: Specifies the maximum acceptable battery level, in a range from 0 to 100. If the battery keeps charging beyond this value, notifications will start being sent every 90 seconds (default value is 90).
-- ```--sound```: A boolean value indicating whether or not sounds should play. True to enable sounds, and False to disable them (default value is True).
-- ```--closing```: A boolean value indicating whether or not an extra Telegram notification should be sent when the program closes and stops tracking the battery status. True to enable this notification, and False to disable it (default value is True).
-
-It is therefore recommended to create a ```.bat``` file with the following line of code and move this file to the directory that runs files at system startup: ```shell:startup```:
-
-```bash
-python BatteryChecker.py --lower 30 --higher 80 --sound True --closing True
-```
+We also used Inno Setup to then turn this executable file into an installer easy for everyone to download and begin its usage.
