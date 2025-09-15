@@ -42,9 +42,9 @@ The goal of this development was to detect if the computer's battery reached a m
 6. For Telegram integration, it is necessary to obtain the Chat ID (without including the "#" sign) to which messages will be sent, as well as the Telegram bot token that will be used to send the messages (to create your own bot, it is recommended to use the BotFather assistant).
 7. A shortcut can be created in the startup folder (accessible by typing ```shell:startup``` in the Run window, which opens with the ```Win + R``` shortcut) for automatic startup when the system boots.
 
-For a visual demonstration of installation, usage, Telegram configuration, startup setup, and troubleshooting errors caused by system confusion, please refer to the following attached video showing these steps.
+For a visual demonstration of installation, usage, Telegram configuration, startup setup, and troubleshooting errors caused by system confusion, please refer to the following attached video showing these steps:
 
-<iframe width="914" height="514" src="https://www.youtube.com/embed/2v45GJmRpF8" title="Battery Notifications: Tutorial and demonstration of use" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+[![Battery Notifications video](./static/cover.png)](https://www.youtube.com/watch?v=2v45GJmRpF8)
 
 <h2 align="center">Technical notes about the development</h2>
 
