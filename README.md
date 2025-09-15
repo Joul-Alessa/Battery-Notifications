@@ -1,3 +1,43 @@
+<p align="center"><img src="./icon.ico" alt="BatteryNotifications" width="100" height="100"></p>
+
+<h1 align="center">Battery Notifications</h1>
+
+<div align="center">
+  <strong>:battery: Battery stress, under control. :battery:</strong><br>
+  App that alerts you when your battery reaches critical stress levels.<br>
+</div>
+
+<div align="center">
+  <!-- License -->
+  <a href="LICENSE">
+    <img src="https://img.shields.io/github/license/Joul-Alessa/Battery-Notifications.svg" alt="LICENSE">
+  </a>
+  <!-- Downloads total -->
+  <a href="https://github.com/Joul-Alessa/Battery-Notifications/releases">
+    <img src="https://img.shields.io/github/downloads/Joul-Alessa/Battery-Notifications/total.svg" alt="total download">
+  </a>
+  <!-- Downloads latest release -->
+  <a href="https://github.com/Joul-Alessa/Battery-Notifications/releases/latest">
+    <img src="https://img.shields.io/github/downloads/Joul-Alessa/Battery-Notifications/v2.1.0/total.svg" alt="latest download">
+  </a>
+</div>
+
+<h2 align="center">Introduction</h2>
+
+By making improper use of my laptop's battery charge, I have caused significant deterioration to the point that the battery is now in a severely damaged state.
+
+Even though this component can be replaced with a new one, I found that my laptop, **which runs on Windows 11**, has a way of notifying the user when the battery is running low. However, it does not have a way to notify the user when the battery is about to reach 100%, which is the case that has caused the deterioration of my battery.
+
+This is why I decided to automate this process with a Python script and be alerted to plug or unplug the device when the battery approaches very low or very high levels, respectively and to develop the solution together with my brother [PPolux21](https://github.com/PPolux21), working side by side to automate this task.
+
+The goal of this development was to detect if the computer's battery reached a minimum limit to plug it in, or a maximum limit to unplug it, and notify the user through a desktop and audible notification on the computer, as well as a notification to the user's phone implemented through a service. Some alternatives considered and discarded included WhatsApp, Discord, e-mail, or SMS.
+
+<iframe width="914" height="514" src="https://www.youtube.com/embed/2v45GJmRpF8" title="Battery Notifications: Tutorial and demonstration of use" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+
+
+
+
+
 # Battery-Notifications
 
 Automating a laptop task that gets notifications when the battery reaches a determined level
