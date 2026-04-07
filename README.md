@@ -44,7 +44,7 @@ The goal of this development was to detect if the computer's battery reached a m
 
 For a visual demonstration of installation, usage, Telegram configuration, startup setup, and troubleshooting errors caused by system confusion, please refer to the following attached video showing these steps:
 
-[![Battery Notifications video](./static/cover.png)](https://www.youtube.com/watch?v=2v45GJmRpF8)
+[![Battery Notifications video](./static/cover.png)](https://www.youtube.com/watch?v=9fiMhlogMwk)
 
 <h2 align="center">Technical notes about the development</h2>
 
